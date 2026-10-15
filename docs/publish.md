@@ -1,64 +1,66 @@
-# 发布到 GitHub 并跑通第一次发布
+**English** · [中文](publish.zh-CN.md)
 
-面向 fork 本仓库的人（也作为本仓库维护者的操作手册）。整条链路是：**GitHub 仓库 → GitHub Actions 构建 → GHCR 镜像 → Release 里的版本锁定模板 → Community Applications**。
+# Publishing to GitHub and getting the first release through
 
-## 1. 建仓库并推送
+For people who fork this repository (it also serves as the maintainer's runbook). The whole chain is: **GitHub repository → GitHub Actions build → GHCR image → version-pinned template in the Release → Community Applications**.
 
-新建 **公开** 仓库（CA 要求公开可读，图标 URL 也必须是公开地址），名称建议 `dsh-unraid`，**不要**勾选 "Add a README"（本地已有提交历史）：
+## 1. Create the repository and push
+
+Create a **public** repository (CA requires public readability, and the icon URL must be a public address too); `dsh-unraid` is the suggested name. Do **not** tick "Add a README" (the commit history already exists locally):
 
 ```bash
-git remote add origin git@github.com:<你的用户名>/dsh-unraid.git   # 或 https://github.com/<你的用户名>/dsh-unraid.git
+git remote add origin git@github.com:<your-username>/dsh-unraid.git   # or https://github.com/<your-username>/dsh-unraid.git
 git push -u origin main
 ```
 
-## 2. 两个必须确认的仓库设置
+## 2. Two repository settings you must confirm
 
-| 设置 | 位置 | 不改会怎样 |
+| Setting | Where | What happens if you leave it |
 |---|---|---|
-| **Workflow permissions = Read and write** | Settings → Actions → General → Workflow permissions | 新建仓库默认只读。只读时 workflow 里写 `packages: write` 也**不会**被授予，推送 GHCR 直接 403。 |
-| **GHCR 包可见性 = Public** | 首次发布成功后：个人头像 → Packages → `dsh` → Package settings → Change visibility | GHCR 包关联公开仓库时通常自动公开；若仍是私有，Unraid 上匿名 `docker pull` 会 401。 |
+| **Workflow permissions = Read and write** | Settings → Actions → General → Workflow permissions | New repositories default to read-only. While read-only, even a `packages: write` in the workflow is **not** granted, and pushing to GHCR returns 403 outright. |
+| **GHCR package visibility = Public** | After the first successful release: your avatar → Packages → `dsh` → Package settings → Change visibility | A GHCR package tied to a public repository is usually public automatically; if it is still private, an anonymous `docker pull` on Unraid returns 401. |
 
-另外两条 GitHub 行为值得知道：
+Two more GitHub behaviours are worth knowing:
 
-- **公开仓库连续 60 天无活动，定时工作流会被自动停用。** 本仓库每天查一次上游，只要上游持续发版就不会触发；若上游长期停更，去 Actions 页面点一次 *Enable workflow*。
-- 工作流之间按 `concurrency` 分组：同一分支上新的 release 运行会让**排队中**的旧运行直接作废，所以不会出现多个构建同时抢发布。
+- **A public repository with 60 consecutive days of no activity has its scheduled workflows disabled automatically.** This repository checks upstream once a day, so as long as upstream keeps releasing this will not trigger; if upstream goes quiet for a long time, open the Actions page and click *Enable workflow* once.
+- Workflows are grouped by `concurrency`: a new release run on the same branch cancels the older **queued** run outright, so several builds never race to publish at once.
 
-## 3. 第一次发布
+## 3. The first release
 
-推送本身就会触发 `release`（`push` 的 `paths` 覆盖 `Dockerfile` / `docker/**` / `scripts/**` / 工作流自身）。也可以手动：Actions → **release** → *Run workflow*。
+The push itself triggers `release` (the `push` `paths` cover `Dockerfile` / `docker/**` / `scripts/**` / the workflow itself). You can also do it manually: Actions → **release** → *Run workflow*.
 
-| 输入 | 说明 |
+| Input | Description |
 |---|---|
-| `version` | 留空 = 自动解析 npm 上 `@deepseek-ai/dsh` 的**最高 semver**（含 alpha/rc） |
-| `force` | 勾上 = 即使 `dsh-<version>` 标签已存在也重建（用于重新发布同一版本） |
+| `version` | Empty = resolve the **highest semver** of `@deepseek-ai/dsh` on npm automatically (alpha/rc included) |
+| `force` | Ticked = rebuild even if the `dsh-<version>` tag already exists (for re-releasing the same version) |
 
-流程：解析版本 → 构建 amd64 → **冒烟测试**（不通过就不推）→ 构建并推送 amd64+arm64（`:版本`、`:latest`、`:alpha|rc|stable`）→ 建标签 `dsh-<version>` → 发 Release（附**版本锁定**的模板 XML 与图标）。
+Flow: resolve the version → build amd64 → **smoke test** (nothing is pushed if it fails) → build and push amd64+arm64 (`:version`, `:latest`, `:alpha|rc|stable`) → create the `dsh-<version>` tag → publish the Release (with the **version-pinned** template XML and icon).
 
-排障入口：
+Troubleshooting entry points:
 
-- `verify` 失败 = 镜像启动或冒烟断言没过，日志里会带出容器日志（`/healthz`、token 引导、跨站 403、两个 Caddyfile、`bwrap`）。
-- `publish` 失败 = 多数是第 2 步的 Workflow permissions 没放开。
-- `publish release and template` 失败 = 权限（`contents: write`）或 `gh` 缺失；该 job 对已存在的 Release 走 **clobber 更新**，重复发同一版本不会报错。
+- `verify` fails = the image did not start or a smoke assertion failed; the log carries the container logs along (`/healthz`, token bootstrap, cross-site 403, the two Caddyfiles, `bwrap`).
+- `publish` fails = usually the Workflow permissions from step 2 were not opened up.
+- `publish release and template` fails = permissions (`contents: write`) or a missing `gh`; that job does a **clobber update** on an existing Release, so re-releasing the same version does not error.
 
-## 4. 让模板指向你的命名空间
+## 4. Point the template at your namespace
 
-仓库里的 `templates/dsh.xml` 保留 `__GHCR_OWNER__` / `__REPO__` / `__IMAGE_TAG__` 占位符，既避免硬编码也方便 fork；但 **CA 解析的是仓库里的实体文件**，所以提交 CA 前要渲染一次并提交（本仓库当前已按 `2220545672` 渲染）：
+`templates/dsh.xml` in the repository keeps the `__GHCR_OWNER__` / `__REPO__` / `__IMAGE_TAG__` placeholders, which avoids hardcoding and makes forking easier; but **CA parses the concrete file in the repository**, so render it once and commit that before submitting to CA (this repository is currently rendered for `2220545672`):
 
 ```bash
-node scripts/render-template.mjs --owner=<你的用户名> --repo=dsh-unraid --tag=latest --out=templates/dsh.xml
-node scripts/check-template.mjs templates/dsh.xml     # 提交前自检
+node scripts/render-template.mjs --owner=<your-username> --repo=dsh-unraid --tag=latest --out=templates/dsh.xml
+node scripts/check-template.mjs templates/dsh.xml     # self-check before committing
 git add templates/dsh.xml && git commit -m "chore: render template for <owner>" && git push
 ```
 
-图标已提交在 `templates/img/dsh.png`。要换风格需先装 `sharp`：
+The icon is already committed at `templates/img/dsh.png`. Changing its style requires installing `sharp` first:
 
 ```bash
 pnpm add -D sharp && node scripts/make-icon.mjs --out=templates/img/dsh.png
-node scripts/make-icon.mjs --flatten='#f4f4f6' --out=/tmp/preview-light.png   # 看浅色卡片观感
+node scripts/make-icon.mjs --flatten='#f4f4f6' --out=/tmp/preview-light.png   # see how it looks on a light card
 ```
 
-素材出处与商标说明见 `templates/img/src/README.md`。
+Sources and the trademark note are in `templates/img/src/README.md`.
 
-## 5. 最后一步是 CA
+## 5. CA is the last step
 
-镜像、模板、自动跟版都跑通之后，才轮到 Community Applications：见 [ca-submission.md](ca-submission.md)（硬性门槛、Validate/Scan 流程）与 [ca-pitfalls.md](ca-pitfalls.md)（会被下架/废弃的真实案例）。
+Only once the image, the template and automatic version tracking all work does Community Applications come into play: see [ca-submission.md](ca-submission.md) (hard requirements, the Validate/Scan flow) and [ca-pitfalls.md](ca-pitfalls.md) (real cases that get delisted or deprecated).

@@ -1,90 +1,84 @@
-# 安全模型
+**English** · [中文](security.zh-CN.md)
 
-这份文档解释容器在**网络层**做了什么。用户只需要知道结论：把它放在会替你鉴权的边缘之后（或用受信内网），需要时设置 `PUBLIC_URL`，**不要把 lan 模式暴露到公网**。
+# Security model
 
-## DSH 自身的浏览器信任栅栏
+This document explains what the container does at the **network layer**. Users only need the conclusion: put it behind an edge that authenticates for you (or a trusted LAN), set `PUBLIC_URL` when needed, and **do not expose lan mode to the internet**.
 
-DSH 有一道防止"浏览器被第三方页面操纵"的检查（实现位于其 `dsh-client-connection` 包）：
+## DSH's own browser trust fence
 
-- 请求的 `Host` 必须是 **loopback**、容器的**监听绑定地址**，或显式通过 `--trusted-host` 声明的 authority；
-- 如果请求带了 `Origin`，它必须与 `Host` 同源；
-- `Sec-Fetch-Site: cross-site` 的请求一律拒绝。
+DSH has a check that prevents "the browser being manipulated by a third-party page" (implemented in its `dsh-client-connection` package):
 
-`dsh web` 因此有两个硬性前提：**不能绑定通配地址**（必须给具体 IP），以及**前面必须有一层知道对外 authority 的代理**。本镜像的做法是：DSH 只监听 `127.0.0.1:3080`，对外由内置的 Caddy 监听 `8080`。
+- The request's `Host` must be **loopback**, the container's **listening bind address**, or an authority explicitly declared via `--trusted-host`;
+- If the request carries an `Origin`, it must be same-origin with `Host`;
+- Requests with `Sec-Fetch-Site: cross-site` are always rejected.
 
-## 两种模式
+This gives `dsh web` two hard prerequisites: **it must not bind a wildcard address** (it must be given a concrete IP), and **there must be a proxy in front that knows the external authority**. This image's approach is: DSH listens only on `127.0.0.1:3080`, and the built-in Caddy listens on `8080` for the outside.
 
-| | edge 模式 | lan 模式 |
+## The two modes
+
+| | edge mode | lan mode |
 |---|---|---|
-| 触发条件 | 设置了 `PUBLIC_URL` | `PUBLIC_URL` 为空 |
-| Host 处理 | 改写成 `PUBLIC_URL` 的 authority | 固定为 loopback |
-| Origin 处理 | 保留，并拒绝任何不等于 `PUBLIC_URL` 的 Origin | **剥掉** Origin |
-| 传给 DSH 的参数 | `--public-url <origin> --trusted-host <authority>`（外加 `DSH_TRUSTED_HOSTS` 里的条目） | 无 |
-| 适用 | 反代 + SSO、VPN、HTTPS 入口 | 只能从受信网络访问 |
+| Trigger | `PUBLIC_URL` is set | `PUBLIC_URL` is empty |
+| Host handling | rewritten to the authority of `PUBLIC_URL` | fixed to loopback |
+| Origin handling | kept, and any Origin not equal to `PUBLIC_URL` is rejected | Origin is **stripped** |
+| Arguments passed to DSH | `--public-url <origin> --trusted-host <authority>` (plus the entries in `DSH_TRUSTED_HOSTS`) | none |
+| Applies to | reverse proxy + SSO, VPN, HTTPS entry | reachable only from trusted networks |
 
-两种模式下防 DNS rebinding 与防跨站都仍然有效：
+In both modes, DNS rebinding protection and cross-site protection remain in force:
 
-- **rebinding** 伪造不出合法的 `Host`（edge 模式要求等于 `PUBLIC_URL`，lan 模式固定为 loopback）；
-- **跨站请求**由 DSH 的 `Sec-Fetch-Site` 规则与 Origin 校验拦下。
+- **rebinding** cannot forge a valid `Host` (edge mode requires equality with `PUBLIC_URL`, lan mode fixes it to loopback);
+- **cross-site requests** are stopped by DSH's `Sec-Fetch-Site` rule and Origin validation.
 
-lan 模式**没有**"对外 authority"的概念，所以它无法为公网访问提供正确的 Host/Origin 判定——这就是"不要暴露到公网"的原因，而不是因为少了一层密码。
+lan mode has **no** notion of an "external authority", so it cannot provide correct Host/Origin determination for public access — that is why "do not expose it to the internet", not because a password layer is missing.
 
-## 谁可以连接：`ALLOWED_CLIENTS`
+## Who may connect: `ALLOWED_CLIENTS`
 
-容器在代理层维护一份白名单，**不在这份名单里的来源拿不到任何页面**：
+The container keeps an allowlist at the proxy layer. Sources that are not on it **get no page at all** — the request never reaches DSH:
 
-- **IP 或 CIDR** 与连接来源地址比对；**主机名**与请求的 `Host` 头比对。
-- **回环地址永远放行**——容器自身的健康检查走回环，收掉它健康检查就会失败。
-- 放在反向代理后面时，连接来源是**代理的地址**。若想按真实客户端 IP 判定，用 `TRUSTED_PROXY_CIDRS` 声明代理所在网段：Caddy 只对这些来源读取 `X-Forwarded-For`。**切勿**把不可信客户端也能发起的网段写进去，否则任何人都能伪造该头绕过白名单。
+- **IPs or CIDRs** are compared against the connection's source address; **hostnames** against the request's `Host` header. The two can be mixed: `127.0.0.1,192.168.0.0/16,dsh.example.com`.
+- **Loopback addresses are always allowed** (`127.0.0.1`, `::1` are added automatically) — the container's own health check goes over loopback, and without it the container would report unhealthy forever.
+- Requests that are not on the allowlist get `403 Forbidden: this client is not listed in ALLOWED_CLIENTS`.
+- Behind a reverse proxy the connection source is **the proxy's address**, so the proxy has to be on the list (from then on the proxy's own authentication decides who gets in). To decide by the **real client IP** instead, declare the proxy's network in `TRUSTED_PROXY_CIDRS`: Caddy then reads `X-Forwarded-For` for those sources only.
+  ⚠️ **Never** put a network that untrusted clients can also originate from into `TRUSTED_PROXY_CIDRS` — that amounts to letting anyone forge the source address and bypass the allowlist. It is empty by default for exactly that reason: by default the peer address is judged, and it cannot be forged.
 
-默认值有三个来源，别混淆：
+The default value has two sources, don't confuse them:
 
-| 场景 | 默认放行 | 说明 |
+| Scenario | Allowed by default | Notes |
 |---|---|---|
-| Unraid 模板 / `compose.yaml` | 回环 + 私有网段（10/8、172.16/12、192.168/16）+ 链路本地 + CGNAT/Tailscale（100.64/10） | 开箱即用；`docker run` 请照抄模板的值 |
-| 镜像自身（未设该变量） | 仅回环 | 安全默认；经发布端口访问会得到 `403` |
+| Unraid template / `compose.yaml` | loopback + private ranges (10/8, 172.16/12, 192.168/16) + link-local + CGNAT/Tailscale (100.64/10) | works out of the box; for `docker run`, copy the template's values |
+| The image itself (variable not set) | loopback only | secure default; access over a published port gets `403` |
 
-### 排障：界面返回 403
+### Troubleshooting: the UI returns 403
 
-1. 在容器日志里看 `access control: clients …` 这一行——它打印的就是实际生效的白名单；
-2. 把你的网段（如 `192.168.0.0/16`）或反向代理的地址加进 `ALLOWED_CLIENTS`；
-3. 经代理访问时，再按需设置 `TRUSTED_PROXY_CIDRS`。
+1. In the container logs, look at the `access control: clients …` line — it prints the allowlist actually in effect;
+2. Add your network (e.g. `192.168.0.0/16`) or the reverse proxy's address to `ALLOWED_CLIENTS`;
+3. When going through a proxy, also set `TRUSTED_PROXY_CIDRS` as needed.
 
-## 两种模式都会做的事
+The implementation lives in `docker/entrypoint.sh` (parsing + generation) and `docker/Caddyfile.{lan,edge}` (marker injection). The rules must be placed inside a **`handle` block**: in testing, a bare `respond` was taken over by the later `route`, and a bare `route` in turn lost to `route /healthz` — both forms let external sources **pass silently** (returning 200). `scripts/smoke.sh` therefore uses a client container on another network specifically to assert 403/200, so that this cannot be broken later.
 
-- **受管端点返回 403**：`/api/settings.openDocument`、`/api/settings.openSettingsDocument` 这类"在桌面端打开文件"的端点对远程调用没有意义，且会扩大攻击面，直接拒绝。
-- **注入安全响应头**：CSP、`X-Frame-Options: DENY`、`Referrer-Policy`、`X-Content-Type-Options` 等。
-- **登录引导**：把 DSH 启动时打印的一次性 token 用内部重写交给首次访问者，换取签名会话 cookie（`dsh-auth-*`）。浏览器地址栏里不会出现 token。
+## What both modes do
 
-## 谁可以连接：`ALLOWED_CLIENTS`
+- **Managed endpoints return 403**: endpoints such as `/api/settings.openDocument` and `/api/settings.openSettingsDocument` that "open a file on the desktop" are meaningless for remote calls and enlarge the attack surface, so they are rejected outright.
+- **Inject security response headers**: CSP, `X-Frame-Options: DENY`, `Referrer-Policy`, `X-Content-Type-Options`, etc.
+- **Login bootstrap**: the one-time token DSH prints at startup is handed to the first visitor via an internal rewrite, in exchange for a signed session cookie (`dsh-auth-*`). The token never appears in the browser's address bar.
 
-上面两节讲的是"请求进来之后"如何判定；`ALLOWED_CLIENTS` 决定的是**请求能不能进来**，默认 `127.0.0.1`（只有本机）。
+## The container itself
 
-- **IP / CIDR** 按连接来源地址匹配；**域名**按 `Host` 头匹配。两者可以混写：`127.0.0.1,192.168.0.0/16,dsh.example.com`。
-- **回环地址永远放行**（`127.0.0.1`、`::1` 会被自动加入），因为容器自身的健康检查就是从回环发起的——否则你把白名单写成只含域名时，容器会一直报不健康。
-- 不在白名单的请求得到 `403 Forbidden: this client is not listed in ALLOWED_CLIENTS`，不会到达 DSH。
-- 前面有反向代理时，容器看到的对端是**代理的地址**，所以要把代理地址加进白名单（此后由代理自己的鉴权决定谁能进来）；如果你想让白名单按**真实客户端 IP** 判定，再填 `TRUSTED_PROXY_CIDRS`，Caddy 就只对这些来源读取 `X-Forwarded-For`。
-  ⚠️ **不要把不可信客户端也能发起的网段填进 `TRUSTED_PROXY_CIDRS`**——那等于允许任何人伪造来源地址绕过白名单。这也是为什么它默认是空的：默认按对端地址判定，伪造不了。
+- Runs as uid/gid `1000` (the non-root account inside the image), and at startup adjusts the owner of `/data` and `/workspace` to `1000:1000` before dropping privileges.
+- **Does not mount** the docker socket, `/boot`, or any host directory (apart from the two volumes the user explicitly maps).
+- The template **does not require** any secrets; model credentials are configured by you in the app UI and stored in `/data`.
+- `AUTH_MODE=builtin` (the default) provides the password gate inside the container: the password is used only to exchange for an HMAC gate cookie (which covers both ordinary requests and the WebSocket handshake), and `/healthz` stays unauthenticated; changing the password or deleting `/data/caddy/data/auth-gate-salt` invalidates every issued cookie.
+- **When the login cookie goes stale** (an image update, a container rebuild, or another DSH instance on the same host — cookies ignore ports): the container **automatically** routes document requests once through `/renew` (with a short-lived marker, so no loop), replaying the startup token and issuing a new session ✓ — users usually just need to refresh; you can also visit `/renew` manually once, or clear that site's cookies.
+- Only `AUTH_MODE=none` hands authentication to the edge (**if you choose it, do not stack the container's own gate on top**, or users are asked for the password twice); any other value (including `caddy-security`, the default of similar images) makes the container **refuse to start**, avoiding the illusion of "looks authenticated, actually weak".
+- ⚠️ A password sent over plain HTTP can be eavesdropped on: internet exposure must be fronted by a reverse proxy that provides HTTPS.
+- ⚠️ **The template ships with a default password `12345678`** (so that "it can log in right after install"; this is a deliberate convenience trade-off): the default is public, and **until you change it the gate is effectively nonexistent** — anyone who can reach the port can get in. entrypoint prints a `SECURITY:` warning on every startup, and both the README and the template description put "change the password first" as step one; if you do not want the default, leave "访问口令" empty (a random one is generated on first start and printed once).
 
-实现位置在 `docker/entrypoint.sh`（解析 + 生成）与 `docker/Caddyfile.{lan,edge}`（标记注入）。规则必须放在 **`handle` 块**里：实测裸 `respond` 会被后面的 `route` 抢走，而裸 `route` 又会输给 `route /healthz`——两种写法都会让外部来源**静默通过**（返回 200）。`scripts/smoke.sh` 因此专门用另一个网络上的客户端容器来断言 403/200，防止以后改坏。
+## Why the container's outer layer relaxes two settings
 
-## 容器本身
-
-- 以 uid/gid `1000` 运行（镜像内的非 root 账户），启动时把 `/data`、`/workspace` 的属主调整为 `1000:1000` 再降权。
-- **不挂载** docker socket、`/boot` 或任何宿主目录（除用户显式映射的两个卷）。
-- 模板里**不要求**任何密钥；模型凭据由你在应用界面里配置，存放在 `/data`。
-- `AUTH_MODE=builtin`（默认）在容器内提供口令门禁：口令只用于换取一个 HMAC 门禁 Cookie（同时覆盖普通请求与 WebSocket 握手），`/healthz` 保持免认证；改口令或删除 `/data/caddy/data/auth-gate-salt` 会让已签发的 Cookie 全部失效。
-- **登录 Cookie 失效时**（跨镜像更新/容器重建/同主机另一个 DSH 实例，见上）：容器会**自动**把文档请求绕一次 `/renew`（带短时标记，不会成环）重放启动 token、签发新会话 ✓ —— 用户通常只需刷新；也可手动访问一次 `/renew`，或清掉该站点 Cookie。
-- `AUTH_MODE=none` 才把鉴权交给边缘（**选了它就别再叠容器自带门禁**，否则用户被问两次口令）；其它取值（含同类镜像默认的 `caddy-security`）会让容器**拒绝启动**，避免出现"看起来有认证、实际很弱"的假象。
-- ⚠️ 口令经明文 HTTP 传输时可被监听：公网暴露必须由前面的反向代理提供 HTTPS。
-- ⚠️ **模板自带默认口令 `12345678`**（为了"装完即可登录"，这是刻意的便利取舍）：默认值是公开的，**在改掉之前门禁形同虚设**——任何能到达该端口的人都能进来。entrypoint 每次启动都会打印 `SECURITY:` 告警，README 与模板描述都把"先改口令"放在第一步；不想用默认值就把「访问口令」留空（首启随机生成并打印一次）。
-
-## 容器外层为什么放宽了两项
-
-模板的 `Extra Parameters` 里有：
+The template's `Extra Parameters` contain:
 
 ```
 --security-opt seccomp=unconfined --security-opt systempaths=unconfined
 ```
 
-这是为了让**容器内层**的 `bubblewrap` 能创建命名空间，从而给智能体的命令执行提供真正的隔离。取舍与对照实验见 [unraid-sandbox.md](unraid-sandbox.md)。
+This is so that `bubblewrap` in the **container's inner layer** can create namespaces, thereby giving the agent's command execution real isolation. For the trade-off and the controlled experiments, see [unraid-sandbox.md](unraid-sandbox.md).

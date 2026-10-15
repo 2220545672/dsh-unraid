@@ -1,33 +1,35 @@
-# 图标素材出处与商标说明
+**English** · [中文](README.zh-CN.md)
 
-`dsh.png`（CA 用的应用图标）由 `scripts/make-icon.mjs` 从下面两个上游 SVG 合成：
+# Icon asset provenance and trademark notice
 
-| 文件 | 来源 | 许可 / 说明 |
+`dsh.png` (the app icon used by CA) is composed by `scripts/make-icon.mjs` from the two upstream SVGs below:
+
+| File | Source | License / notes |
 |---|---|---|
-| `dsh-mark.svg` | DeepSeek Harness 官方品牌素材（维护者提供的 logo SVG，`viewBox="0 0 23.16 17.04"`） | 原文件用 `currentColor`，本仓库固定为品牌蓝 **#4D6BFE**；这是横向的正式标记 |
-| `unraid-mark.svg` | `unraid/docs` 仓库的 `static/img/un-mark-gradient.svg` | Unraid 官方品牌素材（橙色条状 "U" 标） |
+| `dsh-mark.svg` | DeepSeek Harness official brand asset (the logo SVG supplied by the maintainers, `viewBox="0 0 23.16 17.04"`) | The original file uses `currentColor`; this repository pins it to the brand blue **#4D6BFE**. This is the horizontal official mark |
+| `unraid-mark.svg` | `static/img/un-mark-gradient.svg` in the `unraid/docs` repository | Unraid official brand asset (the orange bar-shaped "U" mark) |
 
-## 商标与非官方声明
+## Trademark and non-affiliation notice
 
-本仓库是**社区打包**，与 DeepSeek（深度求索）及 Lime Technology（Unraid）**均无隶属、合作或授权关系**。图标把两个上游标记并列，仅用于说明"这是什么应用、跑在什么平台上"，不代表任何一方的背书。
+This repository is a **community packaging** effort and is **not affiliated with, partnered with, or authorized by** either DeepSeek (深度求索) or Lime Technology (Unraid). The icon places the two upstream marks side by side purely to say "what this app is and what platform it runs on"; it does not represent endorsement by either party.
 
-DSH 官方 [品牌素材使用规范](https://github.com/deepseek-ai/deepseek-harness/blob/master/BRAND_GUIDELINES.zh.md) 的要求是：描述性文字里可以如实说明与 DeepSeek Harness 的关系，但**项目名**建议使用缩写 **DSH**、避免直接使用完整商标。因此本仓库用 `dsh-unraid` / `dsh` 命名，描述里才出现 "DeepSeek Harness"。
+The official DSH [brand asset usage guidelines](https://github.com/deepseek-ai/deepseek-harness/blob/master/BRAND_GUIDELINES.zh.md) require that: descriptive text may truthfully explain the relationship to DeepSeek Harness, but the **project name** should use the abbreviation **DSH**, avoiding direct use of the full trademark. This repository is therefore named `dsh-unraid` / `dsh`, and "DeepSeek Harness" appears only in descriptions.
 
-如果任何一方要求调整，替换这两个文件并重跑 `node scripts/make-icon.mjs` 即可。
+If either party asks for an adjustment, replace these two files and re-run `node scripts/make-icon.mjs`.
 
-## 重新生成
+## Regenerating
 
-两个产物共用同一套素材，必须一起更新：
+The two artifacts share the same set of source assets and must be updated together:
 
-| 产物 | 命令 | 依赖 |
+| Artifact | Command | Dependency |
 |---|---|---|
-| `icon.svg`（仓库根目录，CA 布局要求，矢量） | `node scripts/make-icon-svg.mjs` | 无（纯字符串合成） |
-| `templates/img/dsh.png`（Docker 模板图标） | `node scripts/make-icon.mjs` | 需要 `sharp` |
+| `icon.svg` (repository root, required by the CA layout, vector) | `node scripts/make-icon-svg.mjs` | none (pure string composition) |
+| `templates/img/dsh.png` (Docker template icon) | `node scripts/make-icon.mjs` | requires `sharp` |
 
 ```bash
 node scripts/make-icon-svg.mjs --out=icon.svg
-pnpm add -D sharp          # 或指定已有副本
+pnpm add -D sharp          # or point at an existing copy
 node scripts/make-icon.mjs --out=templates/img/dsh.png
-node scripts/make-icon.mjs --flatten='#f4f4f6' --out=/tmp/preview-light.png   # 看浅色卡片上的观感
-node scripts/make-icon.mjs --flatten='#111827' --out=/tmp/preview-dark.png    # 看深色卡片上的观感
+node scripts/make-icon.mjs --flatten='#f4f4f6' --out=/tmp/preview-light.png   # check how it looks on a light card
+node scripts/make-icon.mjs --flatten='#111827' --out=/tmp/preview-dark.png    # check how it looks on a dark card
 ```

@@ -1,55 +1,57 @@
-# 从别的 DSH 镜像迁移过来
+**English** · [中文](migrate-from-another-image.zh-CN.md)
 
-如果你现在跑的是社区里的其它 DSH 镜像（例如 `ghcr.io/okxlin/deepseek-harness`，容器名常叫 `dsh-web`），想换成 `ghcr.io/<owner>/dsh`，这份文档讲清"最小中断"的做法。
+# Migrating from another DSH image
 
-下面用占位符表示你自己的环境：`<old-container>` = 现有容器名，`<your.domain>` = 反代对外域名，`<appdata>` = `/mnt/user/appdata/<你的应用目录>`。
+If you are running one of the community DSH images (for example `ghcr.io/okxlin/deepseek-harness`, whose container is often called `dsh-web`) and want to switch to `ghcr.io/<owner>/dsh`, this document lays out the "minimal downtime" approach.
 
-## 先想清楚三件事
+The placeholders below stand for your own environment: `<old-container>` = the existing container name, `<your.domain>` = the domain the reverse proxy serves, `<appdata>` = `/mnt/user/appdata/<your app directory>`.
 
-1. **容器名可能变**。Unraid 的容器名取自模板的 `<Name>`（本模板是 `DSH`）。如果你的反向代理（SWAG 等）是按**容器名**解析上游的，容器一改名就会 502。两种做法：
-   - 改反代的上游指向，然后 `docker exec <proxy> nginx -t && docker exec <proxy> nginx -s reload`；
-   - 或者新建容器时把 `<Name>` 手动改成 `<old-container>`，反代就完全不用动。
-   > 反代与容器必须在同一个 docker 网络上，否则容器名解析不了。
-2. **数据可以原地复用**。本模板默认把 `/data` 指到 `/mnt/user/appdata/dsh/data`；若你原来的数据在别处（例如 `<appdata>/data`），**把模板里两个 Path 改回旧路径即可**，会话与凭据原样保留。想用新路径就 `mv` 过去，并保持属主为 `1000:1000`（容器以该 uid 运行）。
-3. **切换会中断正在进行的会话**。停掉旧容器 = 浏览器断线。建议先并行起一个新容器验证，确认无误再切端口与反代，最后删旧容器——**不要**在当前会话里直接 `docker rm -f <old-container>`，用脱离会话的方式或由 GUI 操作。
+## Three things to settle first
 
-## 迁移步骤（最小中断）
+1. **The container name may change.** Unraid takes the container name from the template's `<Name>` (this template uses `DSH`). If your reverse proxy (SWAG and friends) resolves its upstream by **container name**, renaming the container means a 502. Two ways out:
+   - Point the reverse proxy upstream at the new name, then `docker exec <proxy> nginx -t && docker exec <proxy> nginx -s reload`;
+   - or set `<Name>` to `<old-container>` by hand when creating the new container, and the reverse proxy needs no changes at all.
+   > The reverse proxy and the container must be on the same docker network, otherwise the container name will not resolve.
+2. **Data can be reused in place.** This template points `/data` at `/mnt/user/appdata/dsh/data` by default; if your existing data is elsewhere (for example `<appdata>/data`), **point the template's two Path fields back at the old paths** and your sessions and credentials carry over unchanged. If you want the new paths, `mv` the data over and keep the owner at `1000:1000` (the container runs as that uid).
+3. **Cutting over interrupts a session in progress.** Stopping the old container = the browser drops the connection. Start a new container alongside first and verify it, then switch the port and the reverse proxy, and delete the old container last — do **not** run `docker rm -f <old-container>` from inside the current session; use something detached from the session, or the GUI.
 
-### 1. 先建新容器（不动旧的）
+## Migration steps (minimal downtime)
 
-Unraid `Docker → Add Container` → 导入 `templates/dsh.xml`，然后按需调整：
+### 1. Create the new container first (leave the old one alone)
 
-| 字段 | 建议值 | 理由 |
+Unraid `Docker → Add Container` → import `templates/dsh.xml`, then adjust as needed:
+
+| Field | Suggested value | Why |
 |---|---|---|
-| 名称 | `DSH`（或沿用 `<old-container>`） | 决定容器名，见上文第 1 点 |
-| 端口 | 先换一个宿主端口（例如 `127.0.0.1:3081`） | 避开旧容器占用的端口，可并行验证 |
-| `/data` | 旧的数据目录 | 免搬数据；空目录也可以在，首次启动会自动初始化 |
-| `/workspace` | 旧的工作区目录 | 同上 |
-| `PUBLIC_URL` | `https://<your.domain>` | 走 edge 模式（前置反代 + 鉴权）；纯内网可留空 |
-| Extra Parameters | **保持默认**（两个 `--security-opt`） | 否则 bash 工具在 Unraid 上不可用，见 [unraid-sandbox.md](unraid-sandbox.md) |
+| Name | `DSH` (or keep `<old-container>`) | Decides the container name, see point 1 above |
+| Port | Move to a different host port first (for example `127.0.0.1:3081`) | Avoids the port the old container occupies, so you can verify in parallel |
+| `/data` | The old data directory | No data to move; an empty directory is fine too, it is initialized on first start |
+| `/workspace` | The old workspace directory | Same as above |
+| `PUBLIC_URL` | `https://<your.domain>` | Runs edge mode (reverse proxy + authentication in front); leave empty on a pure LAN |
+| Extra Parameters | **Keep the default** (both `--security-opt` values) | Otherwise the bash tool is unusable on Unraid, see [unraid-sandbox.md](unraid-sandbox.md) |
 
-### 2. 验证
+### 2. Verify
 
 ```bash
 docker ps --filter name=DSH --format "{{.Names}} {{.Status}} {{.Ports}}"
 docker logs --tail 40 DSH
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:<新端口>/healthz      # 期望 200
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:<new-port>/healthz      # expect 200
 ```
 
-浏览器打开 `http://<宿主IP>:<新端口>`：能进界面，并且随便让它跑一条命令（例如 `pwd`）**不报 `SANDBOX_UNAVAILABLE`** —— 这一步才真正验证了 bubblewrap 沙箱可用。
+Open `http://<host-ip>:<new-port>` in a browser: you should reach the interface, and having it run any command (for example `pwd`) should come back **without `SANDBOX_UNAVAILABLE`** — only this step really proves the bubblewrap sandbox works.
 
-### 3. 切换
+### 3. Cut over
 
-1. 把新容器的端口改回你原来对外用的那个（GUI 里编辑容器 → 改端口 → Apply）。
-2. 若容器名变了，改反代上游并 reload；用容器名 grep 一下反代配置里所有引用，别漏站点。
-3. 浏览器验证 `https://<your.domain>`，确认登录、会话历史、模型设置都在。
-4. 确认无误后再删旧容器。如果旧容器当初不是用模板创建的（没有 `net.unraid.docker.managed=dockerman` 标签），它本来在 Docker 页里就没有更新入口，删掉反而更干净。
-5. 新容器由模板创建，自带 `dockerman` 标签，Docker 页会正常显示 **更新入口**。
+1. Change the new container's port back to the one you exposed before (edit the container in the GUI → change the port → Apply).
+2. If the container name changed, update the reverse proxy upstream and reload; grep the reverse proxy configuration for the container name so no site is missed.
+3. Verify `https://<your.domain>` in the browser: your login, session history and model settings should all be there.
+4. Delete the old container only after that checks out. If the old container was not created from a template in the first place (no `net.unraid.docker.managed=dockerman` label), it never had an update entry on the Docker page anyway, so deleting it leaves things cleaner.
+5. The new container is created from the template and carries the `dockerman` label, so the Docker page shows its **update entry** as usual.
 
-### 4. 回滚
+### 4. Rollback
 
-删旧容器之前，回滚 = 把反代上游改回去 + 启动旧容器。删掉之后，只要你保留了旧容器的模板 XML（`templates-user/my-*.xml`），仍可用它重建——注意那指向的是旧镜像。
+Before you delete the old container, rollback = point the reverse proxy upstream back + start the old container. After deleting it, you can still rebuild it from the old container's template XML (`templates-user/my-*.xml`) as long as you kept it — note that it points at the old image.
 
-## 之后每次上游发版
+## On every upstream release afterwards
 
-本镜像**自动跟版**：每天检查 npm 上 `@deepseek-ai/dsh` 的最高版本（含 alpha/rc），有新版本就构建、冒烟、推送，并建 `dsh-<版本>` 标签与 Release。你只需要在 Unraid 的 Docker 页点一次 **force update**（或等它提示 apply update），不需要改任何配置。
+This image **tracks upstream automatically**: every day it checks the highest version of `@deepseek-ai/dsh` on npm (alpha/rc included), and when a new version appears it builds, smoke-tests and pushes it, then creates a `dsh-<version>` tag and a Release. All you do is click **force update** once on the Unraid Docker page (or wait for the apply update hint); no configuration changes are needed.

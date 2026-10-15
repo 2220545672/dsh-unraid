@@ -1,127 +1,129 @@
-# 维护者手册
+**English** · [中文](CONTRIBUTING.zh-CN.md)
 
-面向本仓库的维护者与 fork 者。面向用户的内容在 [README.md](README.md)（英文，默认）与 [README.zh-CN.md](README.zh-CN.md)（中文）；两份内容保持一致，改动时请同时更新。
+# Maintainer handbook
 
-## 仓库结构
+For maintainers of this repository and for anyone who forks it. User-facing content is in [README.md](README.md) (English, the default) and [README.zh-CN.md](README.zh-CN.md) (Chinese); the two are kept in sync, so update both whenever you change one.
+
+## Repository layout
 
 ```
 .
-├── Dockerfile                 # 三段构建：DSH 依赖 → Caddy 二进制 → 运行时
+├── Dockerfile                 # three-stage build: DSH deps → Caddy binary → runtime
 ├── docker/
-│   ├── entrypoint.sh          # 校验环境、准备卷、选模式、拉起 Caddy + DSH
-│   ├── Caddyfile.edge         # PUBLIC_URL 已设：Host 改写为对外 authority，拒绝外来 Origin
-│   ├── Caddyfile.lan          # PUBLIC_URL 为空：Host 固定 loopback，剥掉 Origin
-│   └── healthcheck.sh         # 容器 HEALTHCHECK
+│   ├── entrypoint.sh          # validate env, prepare volumes, pick mode, start Caddy + DSH
+│   ├── Caddyfile.edge         # PUBLIC_URL set: rewrite Host to the public authority, reject foreign Origin
+│   ├── Caddyfile.lan          # PUBLIC_URL empty: pin Host to loopback, strip Origin
+│   └── healthcheck.sh         # container HEALTHCHECK
 ├── templates/
-│   ├── dsh.xml                # Unraid 容器模板（CA 解析的就是这份实体文件）
-│   └── img/                   # 图标：dsh.png（模板用）+ src/（素材与生成脚本说明）
-├── icon.svg                   # 仓库级矢量图标（CA 仓库布局要求，ca_profile.xml 指向它）
-├── ca_profile.xml             # CA 仓库信息（必须有非空 <Profile>）
-├── scripts/                   # 版本解析、模板渲染/自检、图标生成、静态闸门、冒烟测试
-├── docs/                      # 用户与提交文档
-└── .github/workflows/         # validate（每次推送）+ release（跟版发布）
+│   ├── dsh.xml                # Unraid container template (this is the real file CA parses)
+│   └── img/                   # icons: dsh.png (used by the template) + src/ (asset and generator docs)
+├── icon.svg                   # repository-level vector icon (required by the CA repo layout; ca_profile.xml points at it)
+├── ca_profile.xml             # CA repository info (must have a non-empty <Profile>)
+├── scripts/                   # version resolution, template render/self-check, icon generation, static gates, smoke tests
+├── docs/                      # user and submission docs
+└── .github/workflows/         # validate (every push) + release (tracks upstream releases)
 ```
 
-## 本地构建与自检
+## Local build and self-checks
 
 ```bash
-# 构建（版本号取自 npm，见下文）
+# Build (the version number comes from npm, see below)
 docker build \
   --build-arg DSH_VERSION=0.2.1-alpha.3 \
   --build-arg NODE_VERSION=24.21.0 \
   --build-arg CADDY_VERSION=2.11.7 \
   -t dsh:local .
 
-# 冒烟：会真的起容器并断言 /healthz、token 引导、跨站 403、Caddy 配置、bwrap
+# Smoke: really starts a container and asserts /healthz, token bootstrap, cross-site 403, Caddy config, bwrap
 bash scripts/smoke.sh dsh:local
 
-# 静态闸门：与 CI 完全一致（语法、XML/YAML/JSON、CA 布局与模板门槛、图标可复现）
+# Static gates: exactly what CI runs (syntax, XML/YAML/JSON, CA layout and template bar, icon reproducibility)
 bash scripts/check-static.sh
 ```
 
-> `check-static.sh` 需要 `python3`（结构校验）。这台开发机上没有时用
-> `ALLOW_MISSING_PYTHON=1 bash scripts/check-static.sh` 跳过那一段——**CI 里不允许跳过**，缺 python3 会直接失败。
+> `check-static.sh` needs `python3` (structural validation). When this dev machine doesn't have it, use
+> `ALLOW_MISSING_PYTHON=1 bash scripts/check-static.sh` to skip that section — **skipping is not allowed in CI**; a missing python3 fails outright.
 
-## 上游版本怎么解析
+## How the upstream version is resolved
 
 ```bash
-node scripts/resolve-dsh-version.mjs --json     # 看解析结果
+node scripts/resolve-dsh-version.mjs --json     # show the resolved result
 node scripts/resolve-dsh-version.mjs --version=0.2.1-alpha.3
 ```
 
-**不要只读 npm 的 `latest` 标签。** 实测 `@deepseek-ai/dsh` 的 `latest` 会落后于 `alpha`（2026-10-15：`latest`=`0.2.0-rc.2`，`alpha`=`0.2.1-alpha.3`），只读 `latest` 的流水线会静默降级。脚本枚举全部已发布版本并按 semver 取最高，预发布按规范参与比较。
+**Do not read only npm's `latest` tag.** Measured: `@deepseek-ai/dsh`'s `latest` lags behind `alpha` (2026-10-15: `latest`=`0.2.0-rc.2`, `alpha`=`0.2.1-alpha.3`), so a pipeline that reads only `latest` silently downgrades. The script enumerates every published version and takes the highest by semver; prereleases participate in the comparison per the spec.
 
-## 图标
+## Icons
 
-两个产物、一套素材，**必须一起更新**：
-
-```bash
-node scripts/make-icon-svg.mjs            # → icon.svg（纯矢量，无依赖）
-node scripts/make-icon.mjs                # → templates/img/dsh.png（栅格化 icon.svg，需要 sharp）
-```
-
-- `icon.svg` 是布局的**唯一事实来源**，`make-icon.mjs` 只做栅格化；CI 会重跑生成器并与提交内容 `diff`，**不允许手改**。
-- 素材与出处见 [templates/img/src/README.md](templates/img/src/README.md)。DSH 官方标记用 `currentColor`，本仓库固定为黑色；Unraid 角标默认 80px（画布 256px，面积约 1/10.2）。
-- 换配色/尺寸：`node scripts/make-icon-svg.mjs --badge=72 --size=256`。
-
-## 模板
-
-`templates/dsh.xml` **不是**模板源文件，而是渲染结果（owner/repo/tag 已替换为本仓库的值）。fork 之后重新渲染：
+Two artifacts, one set of source assets — **they must be updated together**:
 
 ```bash
-node scripts/render-template.mjs --owner=<你的用户名> --repo=dsh-unraid --tag=latest --out=templates/dsh.xml
-node scripts/check-template.mjs templates/dsh.xml        # 单个模板自检
+node scripts/make-icon-svg.mjs            # → icon.svg (pure vector, no dependencies)
+node scripts/make-icon.mjs                # → templates/img/dsh.png (rasterizes icon.svg, needs sharp)
 ```
 
-`check-template.mjs` 会断言：CA 的 minimum/recommended 字段齐全、`ca_profile.xml` 的 `<Profile>` 非空、卷与 `Config` 的宿主机路径一致、沙箱参数在位、**注释成对闭合且根元素正确开闭**（正则匹配会先剥离注释，避免"注释里出现某个标签"把检查骗过去）。
+- `icon.svg` is the **single source of truth** for the layout; `make-icon.mjs` only rasterizes it. CI re-runs the generator and `diff`s it against what was committed, so **hand edits are not allowed**.
+- Source assets and provenance are in [templates/img/src/README.md](templates/img/src/README.md). The official DSH mark uses `currentColor`; this repository pins it to black. The Unraid badge is 80px by default (256px canvas, roughly 1/10.2 of the area).
+- To change colours or size: `node scripts/make-icon-svg.mjs --badge=72 --size=256`.
 
-## 发布
+## Template
 
-两个工作流：
+`templates/dsh.xml` **is not** a template source file; it is rendered output (owner/repo/tag already substituted with this repository's values). Re-render it after forking:
 
-| 工作流 | 触发 | 作用 |
+```bash
+node scripts/render-template.mjs --owner=<your-username> --repo=dsh-unraid --tag=latest --out=templates/dsh.xml
+node scripts/check-template.mjs templates/dsh.xml        # self-check a single template
+```
+
+`check-template.mjs` asserts that: CA's minimum/recommended fields are all present, `ca_profile.xml`'s `<Profile>` is non-empty, the volumes and `Config` agree on the host paths, the sandbox parameters are in place, and **comments are paired and the root element opens and closes correctly** (the regex match strips comments first, so "a tag mentioned inside a comment" cannot fool the check).
+
+## Releasing
+
+Two workflows:
+
+| Workflow | Trigger | What it does |
 |---|---|---|
-| `validate` | 每次推送 | 静态闸门 + shellcheck + hadolint + `caddy validate` + 脚本端到端 |
-| `release` | 每天 cron（07:41 UTC）、推送相关路径、手动 | 解析版本 → **静态闸门** → 构建 amd64 → 冒烟 → 推送 amd64+arm64 → 打标签 → 发 Release（附版本锁定模板与图标） |
+| `validate` | Every push | Static gates + shellcheck + hadolint + `caddy validate` + script end-to-end |
+| `release` | Daily cron (07:41 UTC), pushes to relevant paths, manual | Resolve version → **static gates** → build amd64 → smoke → push amd64+arm64 → tag → publish Release (with the version-pinned template and icon) |
 
-**闸门是共用的**：`release` 的 verify 跑的就是 `validate` 用的那份 `scripts/check-static.sh`，所以**检查不过的提交不会发布任何东西**（`publish` 与 release 资产 job 会被 skip）。此前两者独立，红着的提交照样能发布——已经修掉，别改回去。
+**The gates are shared**: the verify step in `release` runs exactly the `scripts/check-static.sh` that `validate` uses, so **a commit that fails the checks publishes nothing** (the `publish` and release-asset jobs get skipped). The two used to be independent, and a red commit could still publish — that has been fixed, don't change it back.
 
-手动发版：Actions → `release` → *Run workflow*。
+Manual release: Actions → `release` → *Run workflow*.
 
-| 输入 | 说明 |
+| Input | Description |
 |---|---|
-| `version` | 留空 = 自动解析最高版本；也可指定精确版本 |
-| `force` | 勾上 = 即使 `dsh-<version>` 标签已存在也重建（重新发布同一版本、或刷新 Release 资产时用） |
+| `version` | Empty = resolve the highest version automatically; you can also name an exact version |
+| `force` | Checked = rebuild even if the `dsh-<version>` tag already exists (for re-publishing the same version, or refreshing Release assets) |
 
-已发布版本再次运行会走 **skip 分支**：`resolve` 发现标签已存在 → `build=false` → 后面全部跳过，不会浪费构建时间。
+Running it again for an already-published version takes the **skip branch**: `resolve` sees the tag already exists → `build=false` → everything after that is skipped, so no build time is wasted.
 
-## 首次发布要确认的两件事
+## Two things to confirm for your first release
 
-| 设置 | 位置 | 不改会怎样 |
+| Setting | Where | What happens if you don't change it |
 |---|---|---|
-| Workflow permissions = **Read and write** | Settings → Actions → General | 推送 GHCR 会 403（只读时 `packages: write` 不被授予） |
-| GHCR 包可见性 = **Public** | 个人头像 → Packages → `dsh` → Package settings | Unraid 上匿名 `docker pull` 会 401 |
+| Workflow permissions = **Read and write** | Settings → Actions → General | Pushing to GHCR returns 403 (in read-only mode `packages: write` is not granted) |
+| GHCR package visibility = **Public** | Your avatar → Packages → `dsh` → Package settings | An anonymous `docker pull` on Unraid returns 401 |
 
-另外：**公开仓库连续 60 天无活动，定时工作流会被自动停用**。上游若长期停更，去 Actions 页点一次 *Enable workflow*。
+Also: **a public repository with no activity for 60 consecutive days gets its scheduled workflows disabled automatically**. If upstream goes quiet for a long time, open the Actions page and click *Enable workflow* once.
 
-## 提交到 Community Applications
+## Submitting to Community Applications
 
-见 [docs/ca-submission.md](docs/ca-submission.md)（门槛与流程：仓库公开 + OSI 许可证 + `ca_profile.xml` 非空 `<Profile>` + 论坛支持帖 + `/submit/new` 的 Validate/Scan）。提交前先跑 `bash scripts/check-static.sh`，再按 [docs/ca-pitfalls.md](docs/ca-pitfalls.md) 自查一遍——那里记着下架、废弃、模板改动不回流等真实案例。
+See [docs/ca-submission.md](docs/ca-submission.md) (the bar and the process: a public repository + an OSI license + a non-empty `<Profile>` in `ca_profile.xml` + a forum support thread + Validate/Scan under `/submit/new`). Before submitting, run `bash scripts/check-static.sh`, then self-check against [docs/ca-pitfalls.md](docs/ca-pitfalls.md) — it records real cases of delisting, deprecation, and template changes that never flowed back.
 
-## 上机验收（CI 之外）
+## Acceptance on a real machine (outside CI)
 
-CI 只证明镜像能起、能通过断言；**目标平台上真实可跑**还要单独验一次（历史上这一步抓出过 CI 漏掉的 edge 模式缺陷）。要点：
+CI only proves the image starts and passes its assertions; **whether it really runs on the target platform** still needs a separate check (historically this step caught an edge-mode defect that CI missed). The essentials:
 
 ```bash
-docker pull ghcr.io/2220545672/dsh:latest          # 未登录，确认包是 public
+docker pull ghcr.io/2220545672/dsh:latest          # not logged in: confirm the package is public
 docker run -d --name dsh-acceptance -p 127.0.0.1:18099:8080 \
   -e PUBLIC_URL=http://127.0.0.1:18099 -e TZ=Asia/Shanghai \
   -v /tmp/dsh-accept/data:/data -v /tmp/dsh-accept/workspace:/workspace \
   --security-opt seccomp=unconfined --security-opt systempaths=unconfined \
   ghcr.io/2220545672/dsh:latest
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18099/healthz   # 200
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18099/          # 303（带 dsh-auth cookie）
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18099/          # 303 (with a dsh-auth cookie)
 docker exec dsh-acceptance bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all -- /bin/sh -c 'echo SANDBOX_OK'
 ```
 
-用**独立端口与临时卷**验证，不要动正在运行的实例。
+Verify with **a separate port and temporary volumes**; don't touch a running instance.

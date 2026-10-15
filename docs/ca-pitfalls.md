@@ -1,65 +1,67 @@
-# 前人踩过的坑 —— 提交 CA 之前必须规避的清单
+**English** · [中文](ca-pitfalls.zh-CN.md)
 
-来源有两类：**官方文档**（`ca.unraid.net` Submit → Docs，2026-10-15 抓取）与**论坛实证**（维护者与 CA 作者的帖子，含具体后果）。
-每条都标注了对本仓库的处置：✅ 已规避 / ⚠️ 需要你注意 / ❓ 需要你决定。
+# Pitfalls others have already hit — the checklist to avoid before submitting to CA
+
+There are two kinds of sources: **official documentation** (`ca.unraid.net` Submit → Docs, retrieved 2026-10-15) and **forum evidence** (posts by maintainers and by the CA author, including concrete consequences).
+Every entry also states how this repository handles it: ✅ already avoided / ⚠️ you need to pay attention / ❓ you need to decide.
 
 ---
 
-## A. 硬性门槛（不满足就是提交流程走不下去）
+## A. Hard requirements (if unmet, the submission flow cannot proceed)
 
-| # | 坑 | 依据 | 我们的处置 |
+| # | Pitfall | Basis | Our handling |
 |---|---|---|---|
-| A1 | **仓库根目录必须有 `ca_profile.xml`，且 `<Profile>` 非空**，否则"CA will block submission finalization" | 官方《Repository Information XML》 | ✅ 已补 [`ca_profile.xml`](../ca_profile.xml)（含 Profile / Icon / WebPage，`<Forum>` 留注释待填） |
-| A2 | 仓库必须**公开、活跃**，且根目录有 **OSI 认可许可证** | 官方《Submission Help》 | ✅ 公开仓库 + MIT `LICENSE` |
-| A3 | 每个应用条目必须有 `<Repository>`（Docker）或 `<PluginURL>`（插件） | 官方《Repository XML Format》 | ✅ `<Repository>` 指向 `ghcr.io/2220545672/dsh:latest` |
-| A4 | 提交后要跑 **Validate / Scan**，且"每次有意义的 XML 改动后都要重跑" | 官方《Submission Help》 | ⚠️ 这一步只能在你的 Unraid 上做（见 [ca-submission.md](ca-submission.md)） |
-| A5 | **`:latest` 标签不存在会被拉黑**（实例：`ntop/ntopng is blacklisted with ":Latest tag does not exist"`） | 论坛 | ✅ 流水线**永远**同时推 `:latest` 与 `:<版本>`；不要改成只推版本号 |
-| A6 | **声明与实际不符会被下架**：Unspin 因 `PluginURL` 与 .plg 内声明不一致被 CA 移除，修好后**仍需 moderator 手工重新上架**，等了数天 | 论坛 | ⚠️ `<Repository>`/`<TemplateURL>`/`<Registry>`/`<Icon>` 一律指向稳定、真实、短期内不会迁移的位置；**镜像与仓库名一旦提交就不要改** |
-| A7 | **`Mask="true"` 只影响 GUI 显示**：值照样传给容器、也照样存在模板文件里（实测：`Mask="true"` + `my-own-secret-99` → 容器拿到 `DSH_PASSWORD=my-own-secret-99`；模板里也仍是这个值）。⚠️ 此前本条曾写成"遮蔽会让变量丢失"，那是**我们自己的检查脚本**用 `printf "%.11s"` 截断 `DSH_PASSWORD`（12 字符）导致比较永不成立而看漏的，已订正 | 本机对照实验（Mask true/false 两次重建）+ 直接 `grep '^DSH_PASSWORD'` | ✅ 「访问口令」用 `Mask="true"`（界面圆点）且值只写在 `Default` 里；`scripts/check-template.mjs` 不再禁止 Mask，只在注释里记录这段教训 |
-| A8 | **Config 取值规则**：元素**文本非空时以文本为准**，**文本为空时回退 `Default`**。实测两次：端口字段文本 `0.0.0.0:8080` + Default `0.0.0.0:3082` → 容器真的绑到 **8080**；口令字段文本清空 + Default `12345678` → 容器真的拿到 **12345678** | 本机两次重建实测 | ✅ `scripts/check-template.mjs` 断言"文本要么为空、要么等于 Default"（不一致会让人看配置文件以为是一个值、容器里却是另一个值） |
+| A1 | **The repository root must have `ca_profile.xml` with a non-empty `<Profile>`**, otherwise "CA will block submission finalization" | Official "Repository Information XML" | ✅ added [`ca_profile.xml`](../ca_profile.xml) (contains Profile / Icon / WebPage, `<Forum>` left commented out pending) |
+| A2 | The repository must be **public and active**, with an **OSI-approved license** at the root | Official "Submission Help" | ✅ public repository + MIT `LICENSE` |
+| A3 | Every application entry must have `<Repository>` (Docker) or `<PluginURL>` (plugin) | Official "Repository XML Format" | ✅ `<Repository>` points to `ghcr.io/2220545672/dsh:latest` |
+| A4 | After submitting you must run **Validate / Scan**, and "re-run it after every meaningful XML change" | Official "Submission Help" | ⚠️ this step can only be done on your Unraid (see [ca-submission.md](ca-submission.md)) |
+| A5 | **A `:latest` tag that does not exist gets you blacklisted** (example: `ntop/ntopng is blacklisted with ":Latest tag does not exist"`) | Forum | ✅ the pipeline **always** pushes both `:latest` and `:<version>`; do not change it to push only version tags |
+| A6 | **A declaration that does not match reality gets you delisted**: Unspin was removed from CA because its `PluginURL` did not match the declaration inside the .plg, and after fixing it **a moderator still had to re-list it by hand**, which took several days | Forum | ⚠️ `<Repository>`/`<TemplateURL>`/`<Registry>`/`<Icon>` must all point to stable, real locations that will not move in the short term; **once submitted, do not change the image or repository name** |
+| A7 | **`Mask="true"` only affects the GUI display**: the value is still passed to the container and still stored in the template file (measured: `Mask="true"` + `my-own-secret-99` → the container received `DSH_PASSWORD=my-own-secret-99`; the template still held that value too). ⚠️ This entry previously read "masking makes the variable disappear" — that was **our own check script** truncating `DSH_PASSWORD` (12 characters) with `printf "%.11s"` so the comparison never held and the difference was missed; corrected | Local controlled experiment (Mask true/false, two rebuilds) + direct `grep '^DSH_PASSWORD'` | ✅ "Access password" uses `Mask="true"` (dots in the UI) and the value is written only in `Default`; `scripts/check-template.mjs` no longer forbids Mask, it only records this lesson in a comment |
+| A8 | **Config value rules**: **when the element text is non-empty it wins**, **when the text is empty it falls back to `Default`**. Measured twice: port field text `0.0.0.0:8080` + Default `0.0.0.0:3082` → the container really bound to **8080**; password field with empty text + Default `12345678` → the container really received **12345678** | Measured locally with two rebuilds | ✅ `scripts/check-template.mjs` asserts "the text is either empty or equal to Default" (an inconsistency makes people read the config file and believe one value while the container holds another) |
 
-## B. 上架之后才发现就晚了
+## B. Things you only find out after listing — and then it is too late
 
-| # | 坑 | 依据 | 我们的处置 |
+| # | Pitfall | Basis | Our handling |
 |---|---|---|---|
-| B1 | **模板改动不会同步到已安装的机器**：CA 安装时把模板**拷贝**一份到 `templates-user/my-*.xml`，"Nothing you change updates existing installations. Installing makes a copy of what it was at that time, done." | 论坛（CA 作者帖） | ⚠️ 因此：① 需要长期存在的关键行为必须落在**镜像**里，而不是模板字段；② 目前唯一依赖模板字段的关键项是 `ExtraParams` 里那两个 `--security-opt`——**万一将来要改，老用户不会自动获得**，所以镜像在沙箱不可用时必须给出可执行的报错（现在是 `SANDBOX_UNAVAILABLE` + 文档链接）；③ 真要改模板时，先在支持帖里发公告 |
-| B2 | 连**纯信息字段**也会被钉住：维护者更新 `<Overview>` 后，CA 里显示新的，但已安装机器的 **Docker 页面仍显示旧文案**（`my-*.xml` 里是安装那一刻的副本） | 论坛（PassForge 维护者实测） | ⚠️ 所以 `<Overview>` 不要写"最新版本是 X"这类会过期的内容；我们把版本信息交给镜像标签与 Release |
-| B3 | **CA 中心 feed 会停摆**：2026-09-13→09-15 中心 feed 未重建，维护者改了模板在 CA 里看不到（不是你的错） | 论坛 | ⚠️ 若提交后长时间不出现，先查 CA 状态面板的 "Last Change To Application Feed"，别急着反复改模板 |
-| B4 | **审核是人工的，且有等待**：Claude Code 插件"sent in the application last night"次日才出现；OpenClaw 长时间"still waiting on approval" | 论坛 | ⚠️ 预留数天；这期间不要反复提交 |
-| B5 | **被标记废弃 = 用户失去安全更新**：Paperclip 模板因停止维护被 deprecated，作者明说"you won't receive updates, including security fixes" | 论坛 | ✅ 我们的跟版流水线每天检查上游并自动构建推送；维护成本被压到"上游发版即自动" |
+| B1 | **Template changes do not reach machines that already installed it**: at install time CA **copies** the template to `templates-user/my-*.xml`, "Nothing you change updates existing installations. Installing makes a copy of what it was at that time, done." | Forum (post by the CA author) | ⚠️ Therefore: ① critical behaviour that must persist has to live in the **image**, not in template fields; ② the only critical item currently depending on a template field is the two `--security-opt` in `ExtraParams` — **if they ever need changing, existing users will not get it automatically**, so when the sandbox is unavailable the image must produce an actionable error (currently `SANDBOX_UNAVAILABLE` + a documentation link); ③ if the template really must change, announce it in the support thread first |
+| B2 | Even **purely informational fields** get pinned: after the maintainer updated `<Overview>`, CA showed the new text, but **the Docker page on machines that had already installed it still showed the old wording** (`my-*.xml` holds the copy from the moment of installation) | Forum (measured by the PassForge maintainer) | ⚠️ So `<Overview>` must not contain things that go stale such as "the latest version is X"; we leave version information to image tags and Releases |
+| B3 | **The CA central feed stalls**: from 2026-09-13 to 09-15 the central feed was not rebuilt, so maintainers' template changes were not visible in CA (not your fault) | Forum | ⚠️ If it does not show up for a long time after submission, first check "Last Change To Application Feed" on the CA status panel; do not rush to keep changing the template |
+| B4 | **Review is manual and has a queue**: the Claude Code plugin was "sent in the application last night" and only appeared the next day; OpenClaw spent a long time "still waiting on approval" | Forum | ⚠️ Allow several days; do not submit repeatedly during that time |
+| B5 | **Being marked deprecated = users lose security updates**: the Paperclip template was deprecated for no longer being maintained, and the author stated plainly "you won't receive updates, including security fixes" | Forum | ✅ our version-tracking pipeline checks upstream every day and builds and pushes automatically; the maintenance cost is squeezed down to "automatic as soon as upstream releases" |
 
-## C. 审核者会盯的点（AI 类应用尤其）
+## C. Points reviewers watch (especially for AI-type applications)
 
-| # | 坑 | 依据 | 我们的处置 |
+| # | Pitfall | Basis | Our handling |
 |---|---|---|---|
-| C1 | **"AI 生成、缺少人工审查"是明确的扣分项**：CA 社区开发者原话——"both plugins give me a very solid sense of 'this was AI-coded without a substantial human review / understanding of what it does'"，并指出不符合约定会引发"quality/safety"担忧 | 论坛（Community Developer） | ✅ 代码量小且可解释：Dockerfile + 两个 Caddyfile + 一个 entrypoint + 三个脚本；有冒烟测试、模板自检、沙箱对照实验文档。**你本人要能讲清每一处**（尤其两个 `--security-opt`） |
-| C2 | **"别人会替我审代码"是错误预期**："It's your plugin. You write it, not the CA team… This expectation that someone else will do a code review for you is wrong." | 论坛 | ⚠️ 上架即你负责；支持帖要给出排障路径 |
-| C3 | **容器比插件更被鼓励**："Plugins which are better suited as a docker application are not eligible for inclusion in CA"，且容器"better from a security/safety standpoint" | 论坛（Community Developer 转述 CA 政策） | ✅ 我们走 Docker 模板路线（正确的那条） |
-| C4 | **root / docker.sock / `/boot` / 模板里的凭据**是审核重点：社区明确列出 `/boot`、`/var/run/docker.sock` 属于应当排除的宿主路径；另一帖强调"Claude Code running as root has unrestricted ability…" | 论坛 | ✅ 容器内先 root 初始化再降权到 **uid 1000**；不挂 docker socket、不挂 `/boot`；**模板里不要求任何 API key**（模型凭据由 DSH 自己在 `/data` 里管理） |
-| C5 | **运行时下载可执行文件会被要求整改**：OpenClaw 为符合 CA 标准改成"Homebrew no longer automatically downloaded" | 论坛 | ✅ 所有外部二进制（Caddy、Node 依赖）都在**构建期**获取；容器启动时只读现有文件 |
-| C6 | **CVE 与依赖面**会被拿来质疑（MCP 相关三枚 CVE 被反复引用） | 论坛 | ⚠️ 我们的依赖面是官方 npm 包 `@deepseek-ai/dsh` 的封闭依赖树 + Caddy 官方 release；镜像开启 `sbom` 与 `provenance` 证明，可在支持帖里给出 |
+| C1 | **"AI-generated, lacking human review" is an explicit minus**: the original words of a CA community developer — "both plugins give me a very solid sense of 'this was AI-coded without a substantial human review / understanding of what it does'", and he pointed out that not following the conventions triggers "quality/safety" concerns | Forum (Community Developer) | ✅ small and explainable code base: Dockerfile + two Caddyfiles + one entrypoint + three scripts; there are smoke tests, template self-checks, and documented sandbox controlled experiments. **You personally must be able to explain every part** (especially the two `--security-opt`) |
+| C2 | **"Someone else will review the code for me" is a wrong expectation**: "It's your plugin. You write it, not the CA team… This expectation that someone else will do a code review for you is wrong." | Forum | ⚠️ once listed, it is your responsibility; the support thread must give a troubleshooting path |
+| C3 | **Containers are encouraged more than plugins**: "Plugins which are better suited as a docker application are not eligible for inclusion in CA", and containers are "better from a security/safety standpoint" | Forum (Community Developer relaying CA policy) | ✅ we take the Docker template route (the correct one) |
+| C4 | **root / docker.sock / `/boot` / credentials in the template** are review focal points: the community explicitly lists `/boot` and `/var/run/docker.sock` as host paths that should be excluded; another post stresses "Claude Code running as root has unrestricted ability…" | Forum | ✅ inside the container we initialize as root and then drop to **uid 1000**; no docker socket, no `/boot`; **the template requires no API key** (model credentials are managed by DSH itself under `/data`) |
+| C5 | **Downloading executables at runtime will be flagged for rework**: to comply with CA standards, OpenClaw changed to "Homebrew no longer automatically downloaded" | Forum | ✅ all external binaries (Caddy, Node dependencies) are fetched at **build time**; at container startup only existing files are read |
+| C6 | **CVEs and dependency surface** will be used to challenge you (three MCP-related CVEs were cited repeatedly) | Forum | ⚠️ our dependency surface is the closed dependency tree of the official npm package `@deepseek-ai/dsh` + the official Caddy release; the image enables `sbom` and `provenance` attestations, which can be given in the support thread |
 
-## D. 需要你决定的一件事
+## D. One thing you need to decide
 
-| # | 事项 | 建议 |
+| # | Item | Recommendation |
 |---|---|---|
-| D1 | 是否标记 `<Beta>true</Beta>` | 官方字段说明里 `<Beta>` 是"Legacy beta marker. Only true survives"；**上游 DSH 目前只有 alpha/rc 版本**（我们跟的是最高 semver，含预发布），但**这个打包本身是稳定的**。我的建议：**先不标**，改为在支持帖标题与 `<Overview>` 里如实写明"上游仍是预发布、镜像跟随最新版"。若审核者建议标 Beta，再改（注意 B1：改模板不影响已安装机器，但影响新用户） |
+| D1 | Whether to mark `<Beta>true</Beta>` | The official field description says `<Beta>` is a "Legacy beta marker. Only true survives"; **upstream DSH currently only has alpha/rc versions** (we track the highest semver, including pre-releases), but **this packaging itself is stable**. My recommendation: **do not mark it for now**, and instead state honestly in the support thread title and `<Overview>` that "upstream is still pre-release and the image follows the newest version". If a reviewer suggests marking Beta, change it then (note B1: changing the template does not affect already-installed machines, but it does affect new users) |
 
 ---
 
-## 提交前的自查命令
+## Self-check commands before submitting
 
 ```bash
-# 1. 官方门槛：ca_profile.xml 存在且 <Profile> 非空；模板带齐 minimum/recommended 字段
+# 1. Official requirements: ca_profile.xml exists with a non-empty <Profile>; the template carries all minimum/recommended fields
 node scripts/check-template.mjs templates/dsh.xml
 
-# 2. 渲染一份"发布用"模板并再查一遍（release 资产就是这么生成的）
+# 2. Render a "release" template and check it again (this is how the release assets are generated)
 node scripts/render-template.mjs --owner=2220545672 --repo=dsh-unraid --tag=latest --out=/tmp/dsh.xml
 node scripts/check-template.mjs /tmp/dsh.xml
 
-# 3. 镜像匿名可拉 + 多架构
+# 3. Image anonymously pullable + multi-architecture
 curl -s "https://ghcr.io/token?scope=repository:2220545672/dsh:pull&service=ghcr.io" | head -c 80
 
-# 4. 图标必须国内可达（raw 与 jsdelivr 都不行，见 docs/ca-submission.md）
+# 4. The icon must be reachable from China (raw and jsdelivr both fail, see docs/ca-submission.md)
 curl -sI "https://gh-proxy.com/https://raw.githubusercontent.com/2220545672/dsh-unraid/main/templates/img/dsh.png" | head -1
 ```
