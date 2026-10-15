@@ -64,45 +64,6 @@ Model credentials are configured inside the app; this template never asks for a 
 - Tools reporting SANDBOX_UNAVAILABLE mean the template's Extra Parameters were removed; restore the two --security-opt values.
 
 Upstream project: https://github.com/deepseek-ai/deepseek-harness · Documentation: https://github.com/2220545672/dsh-unraid</Description>
-  <Data>
-    <Volume>
-      <HostDir>/mnt/user/appdata/dsh/data</HostDir>
-      <ContainerDir>/data</ContainerDir>
-      <Mode>rw</Mode>
-    </Volume>
-    <Volume>
-      <HostDir>/mnt/user/appdata/dsh/workspace</HostDir>
-      <ContainerDir>/workspace</ContainerDir>
-      <Mode>rw</Mode>
-    </Volume>
-  </Data>
-  <Environment>
-    <Variable>
-      <Value>Asia/Shanghai</Value>
-      <Name>TZ</Name>
-      <Mode/>
-    </Variable>
-    <Variable>
-      <Value/>
-      <Name>PUBLIC_URL</Name>
-      <Mode/>
-    </Variable>
-    <Variable>
-      <Value/>
-      <Name>DSH_TRUSTED_HOSTS</Name>
-      <Mode/>
-    </Variable>
-    <Variable>
-      <Value>127.0.0.1</Value>
-      <Name>ALLOWED_CLIENTS</Name>
-      <Mode/>
-    </Variable>
-    <Variable>
-      <Value/>
-      <Name>TRUSTED_PROXY_CIDRS</Name>
-      <Mode/>
-    </Variable>
-  </Environment>
   <Config Name="WebUI 端口" Target="8080" Default="0.0.0.0:8080" Mode="tcp" Description="DeepSeek Harness Web UI 的宿主侧绑定，格式必须是 IP:端口（Unraid 会把裸端口号误解析成 IP，容器会卡在 Created）。容器内端口固定为 8080；想只让本机访问就改成 127.0.0.1:8080，暴露范围请配合「允许访问的 IP / 域名」一起收紧。| Host-side binding, and it MUST be written as IP:port — Unraid mis-parses a bare port number as an IP and the container stays in Created. The container port is always 8080; use 127.0.0.1:8080 to expose it on the loopback only." Type="Port" Display="always" Required="true" Mask="false">0.0.0.0:8080</Config>
   <Config Name="数据目录" Target="/data" Default="/mnt/user/appdata/dsh/data" Mode="rw" Description="DSH_HOME：会话、凭据、agent home（/data/dsh）与 Caddy 状态。必须是持久化目录，否则重建容器即丢失全部会话。DSH_HOME (sessions, credentials, agents) plus Caddy state; keep it persistent." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/dsh/data</Config>
   <Config Name="工作目录" Target="/workspace" Default="/mnt/user/appdata/dsh/workspace" Mode="rw" Description="智能体的工作目录（DSH_WORKSPACE），容器启动即 cd 到此。宿主机上建议放需要长期保留的项目。The agent's working directory; the container cd's here at start." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/dsh/workspace</Config>
