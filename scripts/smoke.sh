@@ -150,13 +150,13 @@ if [[ -z "${TOOL_MISSING}" ]]; then
 else
     fail "the image is missing tools this deployment needs:${TOOL_MISSING}"
 fi
-if docker exec --user 1000:1000 "${NAME}" sh -c 'test -d "$HOME/workspace" && test -r "$HOME/workspace"' 2>/dev/null; then
+if docker exec --user 1000:1000 "${NAME}" sh -c "test -d \"\$HOME/workspace\" && test -r \"\$HOME/workspace\"" 2>/dev/null; then
     pass 'the workspace is reachable from HOME (where the directory picker opens)'
 else
-    fail 'the workspace is not reachable from HOME ($HOME/workspace); the directory picker would open on an empty home'
+    fail 'the workspace is not reachable from the home directory; the directory picker would open on an empty home'
 fi
-CONTAINER_HOME="$(docker exec --user 1000:1000 "${NAME}" sh -c 'printf %s "${HOME:-unset}"' 2>/dev/null)"
-if docker exec --user 1000:1000 "${NAME}" sh -c 'test -w "${HOME:-/nonexistent}"' 2>/dev/null; then
+CONTAINER_HOME="$(docker exec --user 1000:1000 "${NAME}" sh -c "printf %s \"\${HOME:-unset}\"" 2>/dev/null)"
+if docker exec --user 1000:1000 "${NAME}" sh -c "test -w \"\${HOME:-/nonexistent}\"" 2>/dev/null; then
     pass "HOME (${CONTAINER_HOME}) is writable by the account the container runs as"
 else
     fail "HOME (${CONTAINER_HOME}) is not writable by the account the container runs as; ~/.ssh and tool caches will fail"
