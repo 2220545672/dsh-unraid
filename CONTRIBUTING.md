@@ -84,7 +84,7 @@ Two workflows:
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `validate` | Every push | Static gates + shellcheck + hadolint + `caddy validate` + script end-to-end |
-| `release` | Daily cron (07:41 UTC), pushes to relevant paths, manual | Resolve version → **static gates** → build amd64 → smoke → push amd64+arm64 → tag → publish Release (with the version-pinned template and icon) |
+| `release` | Hourly cron (:17), pushes to relevant paths, manual | Resolve version → **static gates** → build amd64 → smoke → push amd64+arm64 → tag → publish Release (with the version-pinned template and icon) |
 
 **The gates are shared**: the verify step in `release` runs exactly the `scripts/check-static.sh` that `validate` uses, so **a commit that fails the checks publishes nothing** (the `publish` and release-asset jobs get skipped). The two used to be independent, and a red commit could still publish — that has been fixed, don't change it back.
 

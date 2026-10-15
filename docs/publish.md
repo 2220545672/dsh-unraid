@@ -22,7 +22,7 @@ git push -u origin main
 
 Two more GitHub behaviours are worth knowing:
 
-- **A public repository with 60 consecutive days of no activity has its scheduled workflows disabled automatically.** This repository checks upstream once a day, so as long as upstream keeps releasing this will not trigger; if upstream goes quiet for a long time, open the Actions page and click *Enable workflow* once.
+- **A public repository with 60 consecutive days of no activity has its scheduled workflows disabled automatically.** This repository checks upstream every hour, so as long as upstream keeps releasing this will not trigger; if upstream goes quiet for a long time, open the Actions page and click *Enable workflow* once.
 - Workflows are grouped by `concurrency`: a new release run on the same branch cancels the older **queued** run outright, so several builds never race to publish at once.
 
 ## 3. The first release

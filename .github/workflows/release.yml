@@ -7,12 +7,18 @@ name: release
 # scripts/resolve-dsh-version.mjs for the resolution rules.
 
 on:
-  # Once a day rather than hourly. GitHub documents that the schedule event can be
-  # delayed under load and that queued runs may be dropped entirely, and every edit
-  # to this file re-registers the schedule; a daily run at :41 avoids the busy
-  # start-of-hour window and gives the registration a full day to settle.
+  # Hourly, at :17. GitHub documents that the schedule event is delayed under load
+  # and that queued runs may be dropped outright — measured here on 2026-10-15,
+  # when three hourly slots in a row never fired. One daily slot turns a dropped
+  # run into a lost day; an hourly slot gives ~24 chances and caps the damage at an
+  # hour. :17 keeps clear of the busy start of the hour.
+  #
+  # The extra runs are nearly free: when the resolved upstream version already has
+  # its release tag, the build job is skipped and the run is just the resolve step
+  # (measured: 11 s). Editing this file re-registers the schedule, so the first tick
+  # after a change can take up to an hour to appear.
   schedule:
-    - cron: '41 7 * * *'
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       version:

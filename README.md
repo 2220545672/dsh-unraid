@@ -73,7 +73,7 @@ Unraid: **Docker → your container → force update** (or click the "apply upda
 | `:0.2.1-alpha.3` | Pin an exact version |
 | `:alpha` · `:rc` · `:stable` | Follow one upstream channel |
 
-A daily job checks upstream, rebuilds and smoke-tests the image, and publishes only when the checks pass. Upstream currently ships alpha/rc builds, so `:latest` moves often — pin a version tag if you would rather update on your own schedule.
+An hourly job checks upstream, rebuilds and smoke-tests the image, and publishes only when the checks pass. Upstream currently ships alpha/rc builds, so `:latest` moves often — pin a version tag if you would rather update on your own schedule.
 
 ## Problems
 
