@@ -74,7 +74,7 @@ CA 与模板指南都要求：**你自己维护的容器必须有 Unraid 论坛�
 | `<ExtraParams>` | 两个 `--security-opt` | **不要删**，删了 bash 工具就废 |
 | `<WebUI>` | `http://[IP]:[PORT:8080]/` | 与端口 Config 一致 |
 | 卷 | `/data`、`/workspace` → `appdata/dsh/...` | 首次启动会 chown 成 `1000:1000` |
-| `<Support>` | 仓库 Issues | **提交前必须换成论坛支持帖** |
+| `<Support>` | [论坛支持帖](https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/) | ✅ 已替换（2026-10-15 发布在 Community → Docker Containers） |
 | `<TemplateURL>` | 仓库 `main` 的 raw 模板地址 | 官方标为 recommended（identity and review 用） |
 | `<ReadMe>` | 经代理指向仓库 README | starter 里带这个字段，Unraid 详情页会展示 |
 | `<Requires>` | 保留模板的 Extra Parameters | 官方字段：系统要求文本，正好用来提醒沙箱前提 |
@@ -83,7 +83,7 @@ CA 与模板指南都要求：**你自己维护的容器必须有 Unraid 论坛�
 | `<Category>` | `Tools:` | starter 注释说明可用 Apps 里的 **Application Categorizer** 插件生成精确分类，再替换 |
 | `<ExtraSearchTerms>` | `deepseek harness dsh coding agent ai agent cli` | 让搜 "deepseek" 也能命中名为 DSH 的应用 |
 | `<License>` | `MIT` | 详情弹窗展示 |
-| `ca_profile.xml` 的 `<Forum>` | 注释示例 | 开好支持帖后填入并取消注释 |
+| `ca_profile.xml` 的 `<Forum>` | 同一个论坛帖 URL | ✅ 已填入并取消注释 |
 | `<Beta>` | 未设置 | 见 [ca-pitfalls.md](ca-pitfalls.md) D1：建议先不标，但在支持帖里如实说明上游仍是预发布 |
 
 ## 六、之后每次上游发版

@@ -7,7 +7,7 @@
   <MyIP/>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/2220545672/dsh-unraid/issues</Support>
+  <Support>https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/</Support>
   <Project>https://github.com/deepseek-ai/deepseek-harness</Project>
   <License>MIT</License>
   <ExtraSearchTerms>deepseek harness dsh coding agent ai agent cli</ExtraSearchTerms>

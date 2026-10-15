@@ -6,13 +6,12 @@
   live in the repository root, and carry a non-empty Profile element (see
   ca.unraid.net -> Submit -> Docs -> Repository Information XML).
 
-  The Forum element at the bottom is commented out on purpose: Community
-  Applications expects the real support thread, and that thread has to exist
-  first. Uncomment it and paste the URL once the thread is live.
+  The support thread exists, so the Forum element below points at it. Keep it in
+  step with the Support field of every template in this repository.
 -->
 <CommunityApplications>
-  <Profile>本仓库维护 DSH（DeepSeek Harness）在 Unraid 上的容器模板与镜像：多架构（amd64 / arm64），随上游发版自动重建，内置 bubblewrap 以适配没有 Landlock 的 Unraid 内核，并提供中英文安装文档、沙箱原理说明与从其它镜像迁移的步骤。 | This repository maintains the Unraid container template and image for DSH (DeepSeek Harness): multi-arch (amd64 / arm64), rebuilt automatically for each upstream release, with bubblewrap bundled for Unraid kernels that lack Landlock. It carries installation documentation in Chinese and English, the sandbox rationale, and a migration guide.</Profile>
+  <Profile>本仓库维护 DSH（DeepSeek Harness）在 Unraid 上的容器模板与镜像：多架构（amd64 / arm64），随上游发版自动重建，内置 bubblewrap 以适配没有 Landlock 的 Unraid 内核，并提供中英文安装文档、沙箱原理说明与从其它镜像迁移的步骤。 | This repository maintains the Unraid container template and image for DSH (DeepSeek Harness): multi-arch (amd64 / arm64), rebuilt automatically for each upstream release, with bubblewrap bundled for Unraid kernels that lack Landlock. It carries installation documentation in Chinese and English, the sandbox rationale, and a migration guide. Support goes through the Unraid forum thread linked in this profile. | 支持请走本 profile 中链接的 Unraid 论坛支持帖。</Profile>
   <Icon>https://gh-proxy.com/https://raw.githubusercontent.com/2220545672/dsh-unraid/main/icon.svg</Icon>
   <WebPage>https://github.com/2220545672/dsh-unraid</WebPage>
-  <!-- <Forum>https://forums.unraid.net/topic/THREAD_ID/</Forum> -->
+  <Forum>https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/</Forum>
 </CommunityApplications>
