@@ -112,6 +112,23 @@ docker run -d --name dsh --restart unless-stopped \
 
 ## 常见问题
 
+**点了"登录"报「登录失败 / 操作未完成，请重试」**
+
+这是**上游 DSH 的限制，不是本镜像的问题**。账号登录会把浏览器的 `window.location.origin` 交给服务端，而平台模块只接受**回环地址**作为回调：
+
+```js
+// @deepseek-ai/dsh-deepseek-account-platform
+const explicitPort = /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\]):([0-9]+)\/?$/i.exec(value)?.[1];
+// 原文注释：remote domains and path-based proxies are unsupported
+```
+
+因此浏览器必须通过 `http://127.0.0.1:<端口>`（或 `localhost`/`[::1]`）访问 DSH，账号登录才可能开始；局域网、Tailscale、反向代理的 origin 会在发请求之前就被拒，**重试没有用**。
+
+两条出路：
+
+* **改用 API Key**：同一个面板里有「添加 API Key」，服务器部署就该走这条；
+* **想要账号登录**就把界面打隧道到回环：`ssh -L 3081:127.0.0.1:3081 root@<服务器>`，再打开 `http://127.0.0.1:3081` —— 此时浏览器 origin 就是回环，正好满足校验。
+
 **界面打不开 / 一直转圈。**
 先看 `docker logs dsh | head -30`：entrypoint 会写明模式（edge/lan）、上游版本与启动结果。再确认 `PUBLIC_URL` 与你实际访问的地址一致（协议 + 主机名，不要带路径）。
 

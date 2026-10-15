@@ -112,6 +112,23 @@ To update on Unraid: **Docker → your container → force update** (or wait for
 
 ## FAQ
 
+**DeepSeek account sign-in fails with "登录失败 / 操作未完成，请重试" (or "Login failed, please retry")**
+
+That is an upstream limitation, not this image. The account flow passes `window.location.origin` to the server, and the platform module only accepts a **loopback** callback:
+
+```js
+// @deepseek-ai/dsh-deepseek-account-platform
+const explicitPort = /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\]):([0-9]+)\/?$/i.exec(value)?.[1];
+// "remote domains and path-based proxies are unsupported"
+```
+
+So the browser must reach DSH at `http://127.0.0.1:<port>` (or `localhost` / `[::1]`) for account sign-in to start; any LAN, Tailscale or reverse-proxy origin is rejected before a request is even made, and retrying cannot help.
+
+Two ways forward:
+
+* **Use an API key** — the same panel offers *Add API key*, and that is what a server deployment should use.
+* **Tunnel the UI to loopback** if you want the account flow: `ssh -L 3081:127.0.0.1:3081 root@<server>`, then open `http://127.0.0.1:3081`. The browser origin is then loopback, which is exactly what the check wants.
+
 **The UI does not load, or spins forever.**
 Check `docker logs dsh | head -30` first — the entrypoint prints the mode (edge/lan), the upstream version and the startup result. Then make sure `PUBLIC_URL` matches the address you actually open (scheme + host, no trailing path).
 
