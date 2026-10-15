@@ -1,57 +1,64 @@
-# 把这个仓库发到 GitHub 并跑通第一次发布
+# 发布到 GitHub 并跑通第一次发布
 
-本机（DSH 容器）里**没有** GitHub 凭据：`ssh -T git@github.com` 与 `ssh -T git@gitee.com` 都是 `Permission denied (publickey)`，`/data/git/.git-credentials` 里也没有这两个站点的条目。所以推送这一步必须由你完成（或者把凭据交给我）。
+面向 fork 本仓库的人（也作为本仓库维护者的操作手册）。整条链路是：**GitHub 仓库 → GitHub Actions 构建 → GHCR 镜像 → Release 里的版本锁定模板 → Community Applications**。
 
-## 1. 建仓库
+## 1. 建仓库并推送
 
-在 GitHub 上新建 **公开** 仓库（CA 与图标 URL 都要求公开可读）：
-
-- 名称：`dsh-unraid`
-- 不要勾选 "Add a README"（本地已有历史）
-
-## 2. 推送
+新建 **公开** 仓库（CA 要求公开可读，图标 URL 也必须是公开地址），名称建议 `dsh-unraid`，**不要**勾选 "Add a README"（本地已有提交历史）：
 
 ```bash
-cd /workspace/unraid/dsh-unraid
 git remote add origin git@github.com:<你的用户名>/dsh-unraid.git   # 或 https://github.com/<你的用户名>/dsh-unraid.git
 git push -u origin main
 ```
 
-> 本容器的 HOME 不持久，SSH 配置在重建后会丢；母本在 `/data/git/.ssh/config`。若 `git@github.com` 不通，先照 `AGENTS.md` 的办法恢复 `~/.ssh/config`，或在宿主机上推送。
+## 2. 两个必须确认的仓库设置
 
-## 3. 两个必须改的仓库设置（否则流水线会失败）
-
-| 设置 | 位置 | 为什么 |
+| 设置 | 位置 | 不改会怎样 |
 |---|---|---|
-| **Workflow permissions = Read and write** | Settings → Actions → General → Workflow permissions | 新建仓库默认是只读。只读时 workflow 里写 `packages: write` 也**不会**被授予，推送 GHCR 会 403。 |
-| **把 GHCR 包设为 public** | 首次发布成功后：个人头像 → Packages → `dsh` → Package settings → Change visibility | GHCR 包默认是私有的，Unraid 上匿名 `docker pull` 会 401。 |
+| **Workflow permissions = Read and write** | Settings → Actions → General → Workflow permissions | 新建仓库默认只读。只读时 workflow 里写 `packages: write` 也**不会**被授予，推送 GHCR 直接 403。 |
+| **GHCR 包可见性 = Public** | 首次发布成功后：个人头像 → Packages → `dsh` → Package settings → Change visibility | GHCR 包关联公开仓库时通常自动公开；若仍是私有，Unraid 上匿名 `docker pull` 会 401。 |
 
-另外记一条 GitHub 行为：**公开仓库连续 60 天无活动，定时工作流会被自动停用**。本仓库的 cron 每 6 小时跑一次上游检查，只要上游一直在发版就不会触发；如果 DSH 长期停更，去 Actions 页面点一次 "Enable workflow"。
+另外两条 GitHub 行为值得知道：
 
-## 4. 触发第一次发布
+- **公开仓库连续 60 天无活动，定时工作流会被自动停用。** 本仓库每 6 小时查一次上游，只要上游持续发版就不会触发；若上游长期停更，去 Actions 页面点一次 *Enable workflow*。
+- 工作流之间按 `concurrency` 分组：同一分支上新的 release 运行会让**排队中**的旧运行直接作废，所以不会出现多个构建同时抢发布。
 
-Actions → **release** → *Run workflow*：
+## 3. 第一次发布
 
-- `version` 留空（自动解析为 npm 上最高版本；2026-10-15 是 `0.2.1-alpha.3`）
-- `force` 勾上（第一次没有 `dsh-<version>` 标签，其实不勾也会跑；勾上更直观）
+推送本身就会触发 `release`（`push` 的 `paths` 覆盖 `Dockerfile` / `docker/**` / `scripts/**` / 工作流自身）。也可以手动：Actions → **release** → *Run workflow*。
 
-流程会依次执行：解析版本 → 构建 amd64 → 冒烟测试 → 构建并推送 amd64+arm64 → 建标签 `dsh-<version>` → 发 GitHub Release（附**版本锁定**的模板 XML 与图标）。
+| 输入 | 说明 |
+|---|---|
+| `version` | 留空 = 自动解析 npm 上 `@deepseek-ai/dsh` 的**最高 semver**（含 alpha/rc） |
+| `force` | 勾上 = 即使 `dsh-<version>` 标签已存在也重建（用于重新发布同一版本） |
 
-失败时先看失败的 job：`verify` 挂通常是镜像启动/冒烟断言，日志里会打出容器日志。
+流程：解析版本 → 构建 amd64 → **冒烟测试**（不通过就不推）→ 构建并推送 amd64+arm64（`:版本`、`:latest`、`:alpha|rc|stable`）→ 建标签 `dsh-<version>` → 发 Release（附**版本锁定**的模板 XML 与图标）。
 
-## 5. 让模板指向你的命名空间
+排障入口：
 
-仓库里的 `templates/dsh.xml` 用的是占位符（`__GHCR_OWNER__`、`__REPO__`、`__IMAGE_TAG__`），一是避免硬编码，二是方便 fork。**提交 CA 之前**要渲染一次并提交：
+- `verify` 失败 = 镜像启动或冒烟断言没过，日志里会带出容器日志（`/healthz`、token 引导、跨站 403、两个 Caddyfile、`bwrap`）。
+- `publish` 失败 = 多数是第 2 步的 Workflow permissions 没放开。
+- `publish release and template` 失败 = 权限（`contents: write`）或 `gh` 缺失；该 job 对已存在的 Release 走 **clobber 更新**，重复发同一版本不会报错。
+
+## 4. 让模板指向你的命名空间
+
+仓库里的 `templates/dsh.xml` 保留 `__GHCR_OWNER__` / `__REPO__` / `__IMAGE_TAG__` 占位符，既避免硬编码也方便 fork；但 **CA 解析的是仓库里的实体文件**，所以提交 CA 前要渲染一次并提交（本仓库当前已按 `2220545672` 渲染）：
 
 ```bash
-cd /workspace/unraid/dsh-unraid
-node scripts/render-template.mjs --owner=<你的GitHub用户名> --repo=dsh-unraid --tag=latest \
-  --out=templates/dsh.xml
+node scripts/render-template.mjs --owner=<你的用户名> --repo=dsh-unraid --tag=latest --out=templates/dsh.xml
+node scripts/check-template.mjs templates/dsh.xml     # 提交前自检
 git add templates/dsh.xml && git commit -m "chore: render template for <owner>" && git push
 ```
 
-（`templates/img/dsh.png` 已提交在仓库里；要换风格就先 `pnpm add -D sharp`，再跑 `node scripts/make-icon.mjs`，素材与出处见 `templates/img/src/README.md`。）
+图标已提交在 `templates/img/dsh.png`。要换风格需先装 `sharp`：
 
-## 6. 然后才是 CA
+```bash
+pnpm add -D sharp && node scripts/make-icon.mjs --out=templates/img/dsh.png
+node scripts/make-icon.mjs --flatten='#f4f4f6' --out=/tmp/preview-light.png   # 看浅色卡片观感
+```
 
-见 [ca-submission.md](ca-submission.md)：CA 的 claim 只能在你的 Unraid 上生成 `.unraid/community-apps-claim.json`，另外别忘了按官方要求开一个 Unraid 论坛支持帖并把模板的 `<Support>` 指过去。
+素材出处与商标说明见 `templates/img/src/README.md`。
+
+## 5. 最后一步是 CA
+
+镜像、模板、自动跟版都跑通之后，才轮到 Community Applications：见 [ca-submission.md](ca-submission.md)（硬性门槛、Validate/Scan 流程）与 [ca-pitfalls.md](ca-pitfalls.md)（会被下架/废弃的真实案例）。

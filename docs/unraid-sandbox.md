@@ -23,7 +23,7 @@ const PLATFORM_CHAINS = { linux: ["bwrap", "landlock"], darwin: ["seatbelt"], wi
 - **第一梯队 `bwrap`**：本镜像内置。
 - **第二梯队 `landlock`**：`landlock-run` 二进制随 DSH 一起发布，但它要求内核编入 `CONFIG_SECURITY_LANDLOCK`。Unraid 7.3.2（内核 `6.18.38-Unraid`）**没有**编入 —— 对 `landlock_create_ruleset` 系统调用返回 `ENOSYS`，不是"LSM 被禁用"，而是根本不存在。
 
-于是宿主上出现的就是这条报错（你在本会话里也见过它的兄弟版本）：
+于是宿主上出现的就是这条报错：
 
 ```
 Error: sandbox mode "workspace-write" is requested but no sandbox backend is usable on this host;

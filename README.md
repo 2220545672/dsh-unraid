@@ -102,8 +102,8 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 - **`Extra Parameters` 放宽了容器外层**（`seccomp` / `systempaths` 各一项）。这是为了换取内层真正有效的沙箱，取舍见上文那篇文档。
 - **首次发布后需要手动把 GHCR 包设为 public**（GitHub 默认私有）：`GitHub → 个人头像 → Packages → dsh → Package settings → Change visibility`。否则 Unraid 上 `docker pull` 会 401。
 - 上游 DSH 仍在 alpha/rc 阶段，接口与行为都可能变；`:latest` 会跟着它走。
-- **镜像解压后约 1.09 GB**（node 运行时 + Caddy + git/ripgrep 等工具 + DSH 的依赖树）。docker.img 在机械盘上的机器（本仓库作者那台就是）首次拉取会明显偏慢。
-- **国内直连 `ghcr.io` 可能很慢**：本仓库作者实测首次拉取约 **1 MB/s、约 20 分钟**（1.09 GB，未登录匿名拉取，能成功但不受镜像源加速——那些源只覆盖 Docker Hub）。若嫌慢，可在宿主给 dockerd 配代理，或改成从你信任的镜像/中转拉取。
+- **镜像解压后约 1.09 GB**（node 运行时 + Caddy + git/ripgrep 等工具 + DSH 的依赖树）。docker.img 落在机械盘上的机器，首次拉取会明显偏慢。
+- **国内直连 `ghcr.io` 可能很慢**：实测（中国大陆家宽）首次拉取约 **1 MB/s、约 20 分钟**（1.09 GB，未登录匿名拉取，能成功但不受镜像源加速——那些源只覆盖 Docker Hub）。若嫌慢，可在宿主给 dockerd 配代理，或改成从你信任的镜像/中转拉取。
 
 ## 图标与商标
 
@@ -118,7 +118,7 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 | 多架构发布 | index digest `sha256:a357c91a2f4f86b3ffb6f978017773d2e37684eddcc5e5d9d009f09eb84ce7ab`，`linux/amd64` + `linux/arm64`，另有 2 个 SBOM/provenance attestation manifest |
 | 匿名拉取 | 在 Unraid 宿主上未登录 `docker pull ghcr.io/2220545672/dsh:latest` 成功，digest 与上表一致 |
 | CI 冒烟（每次发版都跑） | lan 模式：`/healthz`=ok、`/` 返回 303 + `dsh-auth-*`、跨站 `/api` 403、受管端点 403、两个 Caddyfile `caddy validate`、容器内 `bwrap` 可用；edge 模式：容器起得来、外来 Origin 403、声明 Origin 可达 DSH |
-| **目标平台验收**（2026-10-15，Unraid 7.3.2 / 内核 `6.18.38-Unraid`） | edge 模式（`PUBLIC_URL` 已设）启动 → `/healthz` = ok；`/` 返回 **303** 且下发 `dsh-auth-*` cookie；容器内 `bwrap … -- /bin/sh -c 'echo SANDBOX_OK'` 输出 **SANDBOX_OK**；全程未触碰正在运行的 `dsh-web` |
+| **目标平台验收**（2026-10-15，Unraid 7.3.2 / 内核 `6.18.38-Unraid`） | edge 模式（`PUBLIC_URL` 已设）启动 → `/healthz` = ok；`/` 返回 **303** 且下发 `dsh-auth-*` cookie；容器内 `bwrap … -- /bin/sh -c 'echo SANDBOX_OK'` 输出 **SANDBOX_OK**；验收实例使用独立端口与临时卷，未触碰宿主上正在运行的其他容器 |
 | 图标可达性 | 经 `gh-proxy.com` 取回 8658 B，sha256 `fb9b0e37…` 与本地正本一致 |
 | 模板自检 | `node scripts/check-template.mjs templates/dsh.xml`：CA 的 minimum/recommended 字段齐全、`ca_profile.xml` 的 `<Profile>` 非空、卷与 `Config` 的宿主机路径一致 |
 
@@ -136,7 +136,7 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 | **首次发布** | 见 [docs/publish.md](docs/publish.md)：建仓库 → 推送 → 两个仓库设置（Workflow permissions 必须为 read/write、首发后把 GHCR 包设为 public）→ 手动触发一次 release |
 | 提交到 CA | 见 [docs/ca-submission.md](docs/ca-submission.md)（官方硬性门槛：`ca_profile.xml`、LICENSE、Validate/Scan）与 [docs/ca-pitfalls.md](docs/ca-pitfalls.md)（前人踩过的坑：声明不符被下架、废弃失去安全更新、模板改动不回流、中心 feed 停摆……） |
 | 模板自检 | `node scripts/check-template.mjs templates/dsh.xml`（validate 与 release 都会跑；含 CA 的 minimum/recommended 字段与 `ca_profile.xml` 门槛） |
-| 迁移现有部署 | 见 [docs/migrate-from-dsh-web.md](docs/migrate-from-dsh-web.md)：从 `dsh-web`(okxlin 镜像) 切到本镜像，含"容器名变了要让 SWAG 跟着改"与最小中断步骤 |
+| 迁移现有部署 | 见 [docs/migrate-from-another-image.md](docs/migrate-from-another-image.md)：从其它 DSH 镜像（如 okxlin 的 `dsh-web`）切到本镜像，含"容器名变了要让反代跟着改"与最小中断步骤 |
 
 ## English summary
 
