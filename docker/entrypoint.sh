@@ -46,6 +46,11 @@ AUTH_COOKIE_NAME="${AUTH_COOKIE_NAME:-dsh_gate}"
 AUTH_COOKIE_MAX_AGE="${AUTH_COOKIE_MAX_AGE:-604800}"
 DSH_PASSWORD="${DSH_PASSWORD:-}"
 DSH_PASSWORD_FILE="${DSH_PASSWORD_FILE:-}"
+# The Unraid template ships this as 访问口令's default so that a fresh install has
+# a working login. It is public, so it protects nothing until it is changed; the
+# entrypoint therefore says so at every start (and the README and the template
+# description tell the operator to change it).
+DEFAULT_TEMPLATE_PASSWORD="12345678"
 DSH_HOME="${DSH_HOME:-/data/dsh}"
 DSH_AGENTS_HOME="${DSH_AGENTS_HOME:-${DSH_HOME}/agents}"
 DSH_WORKSPACE="${DSH_WORKSPACE:-/workspace}"
@@ -324,6 +329,9 @@ if [[ "${AUTH_MODE}" == "builtin" ]]; then
         log "                save it now; set DSH_PASSWORD (or DSH_PASSWORD_FILE) to choose your own"
     else
         log "authentication: built-in password gate, user '${AUTH_USER}' (password from ${password_source})"
+    fi
+    if [[ "${password}" == "${DEFAULT_TEMPLATE_PASSWORD}" ]]; then
+        warn "SECURITY: the password is still the template default '${DEFAULT_TEMPLATE_PASSWORD}', which is public. Anybody who can reach this port and knows it can drive the agent: run commands in ${DSH_WORKSPACE}, read the credentials in ${DSH_HOME}. Change 访问口令 / DSH_PASSWORD in the container settings now."
     fi
     [[ -z "${PUBLIC_URL}" ]] || warn "AUTH_MODE=builtin with PUBLIC_URL set: if the proxy in front already authenticates, set AUTH_MODE=none to avoid a second login"
     unset password password_hash

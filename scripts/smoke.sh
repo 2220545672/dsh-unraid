@@ -185,6 +185,35 @@ else
     fail "password gate: upgrade returned ${WS_BLOCKED} unauthenticated and ${WS_ALLOWED} with the cookie"
 fi
 
+# 4c — the password the Unraid template ships must announce itself. Many operators
+# never open the README, so this log line is the only signal that the gate is still
+# protecting nothing (the default is public).
+DEFAULT_NAME="${NAME}-defaultpw"
+DEFAULT_PORT=$((PORT + 2))
+mkdir -p "${WORKDIR}/data-default" "${WORKDIR}/workspace-default"
+docker run --detach --name "${DEFAULT_NAME}" \
+    --env 'ALLOWED_CLIENTS=127.0.0.1,172.16.0.0/12' \
+    --env 'DSH_PASSWORD=12345678' \
+    --publish "127.0.0.1:${DEFAULT_PORT}:8080" \
+    --volume "${WORKDIR}/data-default:/data" \
+    --volume "${WORKDIR}/workspace-default:/workspace" \
+    "${IMAGE}" >/dev/null
+for _ in $(seq 1 30); do
+    if curl --silent --fail --max-time 3 "http://127.0.0.1:${DEFAULT_PORT}/healthz" >/dev/null 2>&1; then break; fi
+    sleep 2
+done
+if docker logs "${DEFAULT_NAME}" 2>&1 | grep --quiet 'still the template default'; then
+    pass 'the shipped default password announces itself in the log'
+else
+    fail 'a container using the shipped default password did not warn about it'
+fi
+if docker logs "${DEFAULT_NAME}" 2>&1 | grep --quiet '(auth=builtin)'; then
+    pass 'the default AUTH_MODE is builtin (the gate is on out of the box)'
+else
+    fail 'the image did not start with auth=builtin by default'
+fi
+docker rm -f "${DEFAULT_NAME}" >/dev/null 2>&1 || true
+
 # 5 — bubblewrap
 if docker exec "${NAME}" bwrap --version >/dev/null 2>&1; then
     pass 'bubblewrap is installed'
