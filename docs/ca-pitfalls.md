@@ -24,7 +24,7 @@
 | B2 | 连**纯信息字段**也会被钉住：维护者更新 `<Overview>` 后，CA 里显示新的，但已安装机器的 **Docker 页面仍显示旧文案**（`my-*.xml` 里是安装那一刻的副本） | 论坛（PassForge 维护者实测） | ⚠️ 所以 `<Overview>` 不要写"最新版本是 X"这类会过期的内容；我们把版本信息交给镜像标签与 Release |
 | B3 | **CA 中心 feed 会停摆**：2026-09-13→09-15 中心 feed 未重建，维护者改了模板在 CA 里看不到（不是你的错） | 论坛 | ⚠️ 若提交后长时间不出现，先查 CA 状态面板的 "Last Change To Application Feed"，别急着反复改模板 |
 | B4 | **审核是人工的，且有等待**：Claude Code 插件"sent in the application last night"次日才出现；OpenClaw 长时间"still waiting on approval" | 论坛 | ⚠️ 预留数天；这期间不要反复提交 |
-| B5 | **被标记废弃 = 用户失去安全更新**：Paperclip 模板因停止维护被 deprecated，作者明说"you won't receive updates, including security fixes" | 论坛 | ✅ 我们的跟版流水线每 6 小时检查上游并自动构建推送；维护成本被压到"上游发版即自动" |
+| B5 | **被标记废弃 = 用户失去安全更新**：Paperclip 模板因停止维护被 deprecated，作者明说"you won't receive updates, including security fixes" | 论坛 | ✅ 我们的跟版流水线每天检查上游并自动构建推送；维护成本被压到"上游发版即自动" |
 
 ## C. 审核者会盯的点（AI 类应用尤其）
 

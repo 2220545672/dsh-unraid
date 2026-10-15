@@ -7,8 +7,12 @@ name: release
 # scripts/resolve-dsh-version.mjs for the resolution rules.
 
 on:
+  # Once a day rather than hourly. GitHub documents that the schedule event can be
+  # delayed under load and that queued runs may be dropped entirely, and every edit
+  # to this file re-registers the schedule; a daily run at :41 avoids the busy
+  # start-of-hour window and gives the registration a full day to settle.
   schedule:
-    - cron: '23 * * * *'
+    - cron: '41 7 * * *'
   workflow_dispatch:
     inputs:
       version:

@@ -82,7 +82,7 @@ node scripts/check-template.mjs templates/dsh.xml        # 单个模板自检
 | 工作流 | 触发 | 作用 |
 |---|---|---|
 | `validate` | 每次推送 | 静态闸门 + shellcheck + hadolint + `caddy validate` + 脚本端到端 |
-| `release` | 每小时 cron、推送相关路径、手动 | 解析版本 → **静态闸门** → 构建 amd64 → 冒烟 → 推送 amd64+arm64 → 打标签 → 发 Release（附版本锁定模板与图标） |
+| `release` | 每天 cron（07:41 UTC）、推送相关路径、手动 | 解析版本 → **静态闸门** → 构建 amd64 → 冒烟 → 推送 amd64+arm64 → 打标签 → 发 Release（附版本锁定模板与图标） |
 
 **闸门是共用的**：`release` 的 verify 跑的就是 `validate` 用的那份 `scripts/check-static.sh`，所以**检查不过的提交不会发布任何东西**（`publish` 与 release 资产 job 会被 skip）。此前两者独立，红着的提交照样能发布——已经修掉，别改回去。
 

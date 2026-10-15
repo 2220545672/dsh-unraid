@@ -29,7 +29,7 @@ ghcr.io/2220545672/dsh:latest
 ## Features
 
 - **A command sandbox that works out of the box.** Tools run inside `bubblewrap`, and the template ships the two launch options it needs on Unraid. No hunting down `SANDBOX_UNAVAILABLE`.
-- **Updated automatically.** An hourly check rebuilds, smoke-tests and publishes whenever upstream releases a new version. You just hit update.
+- **Updated automatically.** A daily check rebuilds, smoke-tests and publishes whenever upstream releases a new version. You just hit update.
 - **Multi-arch.** `linux/amd64` and `linux/arm64`, with SBOM and provenance attestations.
 - **Tight runtime.** Non-root (uid 1000), no docker socket, no `/boot`, no credentials in the template.
 - **Authentication at the edge.** No password login inside the container; pair it with SWAG + Authelia, a VPN, or a trusted LAN.

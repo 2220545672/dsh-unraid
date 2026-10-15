@@ -27,7 +27,7 @@
   <Description>DSH（DeepSeek Harness）是开源的编码智能体，界面就在浏览器里：它能读改你的项目文件、执行命令、管理模型与会话历史，工具与能力都通过插件扩展。
 
 **为什么用这个镜像**
-- 自动跟随上游：镜像每小时检查上游版本，一有新版本就构建、冒烟测试并推送；你只要在 Docker 页点一次更新，不用改任何配置。
+- 自动跟随上游：镜像每天检查上游版本，一有新版本就构建、冒烟测试并推送；你只要在 Docker 页点一次更新，不用改任何配置。
 - 命令沙箱真的能用：Unraid 内核没有启用 Landlock，DSH 的沙箱只剩 bubblewrap 一条腿。镜像内置 bubblewrap，模板默认带上它需要的两个启动参数，因此工具不会因为缺少沙箱而拒绝执行。
 - 以非 root 身份运行（uid 1000）、多架构（amd64 / arm64）、不含内建密码登录——鉴权交给你的反向代理或受信内网。
 
@@ -48,7 +48,7 @@
 DSH (DeepSeek Harness) is an open-source coding agent whose interface is a browser tab: it reads and edits your project files, runs commands, and manages models and session history, with everything extensible through plugins.
 
 **Why this image**
-- Automatic updates: an hourly upstream check rebuilds, smoke-tests and publishes whenever a new version lands. You just hit update in the Docker tab.
+- Automatic updates: a daily upstream check rebuilds, smoke-tests and publishes whenever a new version lands. You just hit update in the Docker tab.
 - A command sandbox that actually works: Unraid kernels ship without Landlock, which leaves bubblewrap as the only rung for DSH's sandbox. bubblewrap is bundled and the template carries the two launch options it needs, so commands never refuse to run for lack of isolation.
 - Runs as non-root (uid 1000), multi-arch (amd64 / arm64), and ships no password login of its own — authentication belongs to your reverse proxy or a trusted LAN.
 

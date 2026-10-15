@@ -52,4 +52,4 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:<新端口>/healthz   
 
 ## 之后每次上游发版
 
-本镜像**自动跟版**：每 6 小时检查 npm 上 `@deepseek-ai/dsh` 的最高版本（含 alpha/rc），有新版本就构建、冒烟、推送，并建 `dsh-<版本>` 标签与 Release。你只需要在 Unraid 的 Docker 页点一次 **force update**（或等它提示 apply update），不需要改任何配置。
+本镜像**自动跟版**：每天检查 npm 上 `@deepseek-ai/dsh` 的最高版本（含 alpha/rc），有新版本就构建、冒烟、推送，并建 `dsh-<版本>` 标签与 Release。你只需要在 Unraid 的 Docker 页点一次 **force update**（或等它提示 apply update），不需要改任何配置。
