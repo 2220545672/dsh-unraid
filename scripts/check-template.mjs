@@ -46,7 +46,7 @@ if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) errors.push(`<Name> is missing o
 const repository = tag('Repository')
 if (!/^[\w.-]+(\/[\w.-]+)+(:[\w.-]+)?$/.test(repository)) errors.push(`<Repository> does not look like an image reference: "${repository}"`)
 else notes.push(`image: ${repository}`)
-if (/:(latest)?$/.test(repository)) notes.push('image tag is latest (CA convention; the release workflow also ships version-pinned templates)')
+if (repository.endsWith(':latest')) notes.push('image tag is latest (CA convention; the release workflow also ships version-pinned templates)')
 
 // 4 — links
 for (const field of ['Registry', 'Project', 'Icon']) {

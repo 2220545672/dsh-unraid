@@ -152,4 +152,52 @@ if [[ "${FAILURES}" -ne 0 ]]; then
     exit 1
 fi
 
+# 7 — edge mode: PUBLIC_URL set. Caddy rewrites Host to that authority (passed to
+#     DSH as --trusted-host) and refuses any request carrying a different Origin.
+#     The container above ran in lan mode, so this path was never exercised.
+EDGE_NAME="dsh-smoke-edge-$$"
+EDGE_PORT=$((PORT + 1))
+mkdir -p "${WORKDIR}/data-edge" "${WORKDIR}/workspace-edge"
+docker run --detach --name "${EDGE_NAME}" \
+    --publish "127.0.0.1:${EDGE_PORT}:8080" \
+    --security-opt seccomp=unconfined \
+    --security-opt systempaths=unconfined \
+    --volume "${WORKDIR}/data-edge:/data" \
+    --volume "${WORKDIR}/workspace-edge:/workspace" \
+    --env "PUBLIC_URL=http://127.0.0.1:${EDGE_PORT}" \
+    "${IMAGE}" >/dev/null
+
+edge_ready=0
+for _ in $(seq 1 60); do
+    if curl --silent --fail --max-time 3 "http://127.0.0.1:${EDGE_PORT}/healthz" >/dev/null 2>&1; then edge_ready=1; break; fi
+    if [[ "$(docker inspect --format '{{.State.Running}}' "${EDGE_NAME}" 2>/dev/null)" != "true" ]]; then break; fi
+    sleep 2
+done
+if [[ "${edge_ready}" != "1" ]]; then
+    fail "edge mode: /healthz never answered"
+    docker logs "${EDGE_NAME}" || true
+else
+    pass "edge mode: container starts with PUBLIC_URL set"
+fi
+
+EDGE_ORIGIN="http://127.0.0.1:${EDGE_PORT}"
+SAME_ORIGIN_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    --request POST --header "Origin: ${EDGE_ORIGIN}" --header 'Content-Type: application/json' \
+    --data '{}' "http://127.0.0.1:${EDGE_PORT}/api/settings.describe" || true)"
+FOREIGN_ORIGIN_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    --request POST --header 'Origin: http://evil.example' --header 'Content-Type: application/json' \
+    --data '{}' "http://127.0.0.1:${EDGE_PORT}/api/settings.describe" || true)"
+if [[ "${FOREIGN_ORIGIN_CODE}" == "403" ]]; then
+    pass "edge mode: a foreign Origin is refused (403)"
+else
+    fail "edge mode: foreign Origin returned ${FOREIGN_ORIGIN_CODE}, expected 403"
+fi
+if [[ "${SAME_ORIGIN_CODE}" != "403" ]]; then
+    pass "edge mode: the advertised Origin reaches DSH (${SAME_ORIGIN_CODE})"
+else
+    fail "edge mode: the advertised Origin was refused (403), so the Host rewrite/trusted-host wiring is wrong"
+fi
+
+docker rm -f "${EDGE_NAME}" >/dev/null 2>&1 || true
+
 printf '\nall smoke checks passed\n'
