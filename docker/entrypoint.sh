@@ -194,12 +194,12 @@ fi
 log "starting DeepSeek Harness ${DSH_VERSION:-unknown} on 127.0.0.1:${DSH_INTERNAL_PORT} (mode=${MODE})"
 (
     cd "${DSH_WORKSPACE}"
-    exec as_app_user dsh "${DSH_ARGS[@]}"
+    exec setpriv --reuid "${APP_UID}" --regid "${APP_GID}" --init-groups -- dsh "${DSH_ARGS[@]}"
 ) > >(tee "${DSH_STARTUP_LOG}") 2>&1 &
 DSH_PID=$!
 
 wait_for_dsh() {
-    local attempt status
+    local status
     for _ in $(seq 1 60); do
         if ! kill -0 "${DSH_PID}" 2>/dev/null; then
             wait "${DSH_PID}" || true
@@ -214,7 +214,7 @@ wait_for_dsh() {
 }
 
 resolve_launch_token() {
-    local attempt line
+    local line
     for _ in $(seq 1 60); do
         while IFS= read -r line; do
             if [[ "${line}" =~ ^dsh\ web:\ http://127\.0\.0\.1:${DSH_INTERNAL_PORT}/\?token=([A-Za-z0-9_-]{20,256})$ ]]; then

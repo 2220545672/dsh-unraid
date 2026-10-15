@@ -29,7 +29,9 @@ FAILURES=0
 
 cleanup() {
     docker rm -f "${NAME}" >/dev/null 2>&1 || true
-    rm -rf "${WORKDIR}"
+    # The container chowns the bind mounts to uid 1000, which the runner user is
+    # not, so the plain rm can fail; try sudo before giving up.
+    rm -rf "${WORKDIR}" 2>/dev/null || sudo rm -rf "${WORKDIR}" 2>/dev/null || true
 }
 trap cleanup EXIT
 
