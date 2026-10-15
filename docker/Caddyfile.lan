@@ -1,0 +1,71 @@
+# Caddy — lan mode. Selected by the entrypoint when PUBLIC_URL is empty.
+#
+# Same contract as Caddyfile.edge, with one difference that matters: the Host
+# presented to DSH is the loopback listener, and the browser's Origin is
+# stripped. DSH's fence then accepts the request because the Host is loopback,
+# while the two defences that protect a LAN deployment stay in force:
+#   * DNS rebinding cannot forge Host, so a rebound browser read is refused;
+#   * the fence still rejects any request marked `Sec-Fetch-Site: cross-site`,
+#     which is how a malicious page's fetch() announces itself.
+#
+# Use this mode for a trusted LAN (or a VPN) only. In front of the internet,
+# set PUBLIC_URL and terminate TLS at an authenticating proxy.
+{
+	admin off
+	auto_https off
+	grace_period 10s
+}
+
+:{$PORT} {
+	header {
+		-Server
+		Content-Security-Policy "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+	}
+
+	@forwarded_https header X-Forwarded-Proto https
+	header @forwarded_https Strict-Transport-Security "max-age=31536000"
+
+	route /healthz {
+		respond "ok" 200
+	}
+
+	route /dsh-deployment.js {
+		header {
+			Content-Type "application/javascript; charset=utf-8"
+			Cache-Control "no-store"
+		}
+		respond "globalThis.__DSH_AUTHENTICATED_SETTINGS__ = true;" 200
+	}
+
+	@dsh_bootstrap {
+		path /
+		not header Cookie *dsh-auth-*
+	}
+	@native_settings_api path /api/settings.openDocument /api/settings.openSettingsDocument
+
+	route @native_settings_api {
+		respond "Forbidden" 403
+	}
+
+	route {
+		rewrite @dsh_bootstrap /?token={$DSH_LAUNCH_TOKEN}
+		reverse_proxy 127.0.0.1:{$DSH_INTERNAL_PORT} {
+			header_up Host {$DSH_UPSTREAM_HOST}
+			header_up -Origin
+			header_up -Authorization
+			header_up -Remote-User
+			header_up -X-Auth-User
+			header_up -X-Authenticated-User
+			header_up -X-Email
+			header_up -X-Forwarded-User
+			header_up -X-Roles
+			header_up -X-Remote-User
+			header_up -X-User
+			header_up -X-Webauth-User
+		}
+	}
+}

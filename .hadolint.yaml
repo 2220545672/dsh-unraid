@@ -1,0 +1,7 @@
+# Debian security updates matter more here than byte-reproducible apt pins, and
+# the base image is pinned by tag; these rules would only add churn.
+ignored:
+  - DL3008 # pin versions in apt-get install
+  - DL3013 # pin versions in pip install
+  - DL3059 # multiple consecutive RUN instructions
+failure-threshold: error

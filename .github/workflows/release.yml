@@ -1,0 +1,231 @@
+name: release
+
+# Tracks upstream DeepSeek Harness and publishes a multi-arch image.
+#
+# The version signal is the npm registry, not GitHub Releases (upstream has
+# none) and not the `latest` dist-tag (it lags behind `alpha`). See
+# scripts/resolve-dsh-version.mjs for the resolution rules.
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Exact @deepseek-ai/dsh version to build (empty = newest published)'
+        required: false
+        default: ''
+      force:
+        description: 'Rebuild even when the release tag already exists'
+        type: boolean
+        required: false
+        default: false
+      platforms:
+        description: 'Target platforms'
+        required: false
+        default: 'linux/amd64,linux/arm64'
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'docker/**'
+      - 'scripts/**'
+      - '.github/workflows/release.yml'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/deepseek-harness
+  DEFAULT_NODE_VERSION: '24.21.0'
+  CADDY_VERSION: '2.11.7'
+
+jobs:
+  resolve:
+    name: resolve upstream version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+      node: ${{ steps.pick.outputs.node }}
+      channel: ${{ steps.pick.outputs.channel }}
+      dist_tags: ${{ steps.pick.outputs.dist_tags }}
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resolve the newest published version
+        id: pick
+        env:
+          DEFAULT_NODE_VERSION: ${{ env.DEFAULT_NODE_VERSION }}
+        run: |
+          set -euo pipefail
+          node scripts/resolve-dsh-version.mjs --version='${{ inputs.version }}' >> "${GITHUB_OUTPUT}"
+          channel="$(awk -F= '$1 == "version" { print $2 }' "${GITHUB_OUTPUT}" | grep -oE 'alpha|beta|rc' | head -n1 || true)"
+          echo "channel=${channel:-stable}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "### Resolved"
+            echo ''
+            echo "- version: \`$(awk -F= '$1 == "version" { print $2 }' "${GITHUB_OUTPUT}")\`"
+            echo "- node: \`$(awk -F= '$1 == "node" { print $2 }' "${GITHUB_OUTPUT}")\`"
+            echo "- dist-tags: \`$(awk -F= '$1 == "dist_tags" { print $2 }' "${GITHUB_OUTPUT}")\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Decide whether to build
+        id: decide
+        run: |
+          set -euo pipefail
+          tag="dsh-${{ steps.pick.outputs.version }}"
+          if [[ '${{ inputs.force }}' == 'true' ]]; then
+            echo 'build=true' >> "${GITHUB_OUTPUT}"
+            echo "::notice::force=true, rebuilding ${tag}"
+            exit 0
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo 'build=false' >> "${GITHUB_OUTPUT}"
+            echo "::notice::${tag} is already published; nothing to do"
+          else
+            echo 'build=true' >> "${GITHUB_OUTPUT}"
+            echo "::notice::${tag} is new; building"
+          fi
+
+  verify:
+    name: verify amd64 image
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the amd64 image locally
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          platforms: linux/amd64
+          tags: dsh-verify:${{ needs.resolve.outputs.version }}
+          build-args: |
+            DSH_VERSION=${{ needs.resolve.outputs.version }}
+            NODE_VERSION=${{ needs.resolve.outputs.node }}
+            CADDY_VERSION=${{ env.CADDY_VERSION }}
+            SOURCE_REPO=${{ github.repository }}
+
+      - name: Smoke test the image
+        run: bash scripts/smoke.sh "dsh-verify:${{ needs.resolve.outputs.version }}"
+
+  publish:
+    name: publish multi-arch image
+    needs: [resolve, verify]
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ inputs.platforms || 'linux/amd64,linux/arm64' }}
+          push: true
+          provenance: true
+          sbom: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve.outputs.channel }}
+          build-args: |
+            DSH_VERSION=${{ needs.resolve.outputs.version }}
+            NODE_VERSION=${{ needs.resolve.outputs.node }}
+            CADDY_VERSION=${{ env.CADDY_VERSION }}
+            SOURCE_REPO=${{ github.repository }}
+
+      - name: Summary
+        run: |
+          {
+            echo "### Published"
+            echo ''
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve.outputs.version }}\`"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\` (moving)"
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve.outputs.channel }}\` (channel)"
+            echo "- digest: \`${{ steps.push.outputs.digest }}\`"
+            echo ''
+            echo 'If this is the first publish, make the package public: GitHub → your profile → Packages → deepseek-harness → Package settings → Change visibility.'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  release:
+    name: publish release and template
+    needs: [resolve, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Render the version-pinned Unraid template and icon
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          node scripts/make-icon.mjs --out=templates/img/deepseek-harness.png
+          node scripts/render-template.mjs \
+            --tag='${{ needs.resolve.outputs.version }}' \
+            --version='${{ needs.resolve.outputs.version }}' \
+            --out='dist/deepseek-harness.xml'
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version='${{ needs.resolve.outputs.version }}'
+          tag="dsh-${version}"
+          cat > dist/notes.md <<EOF
+          DeepSeek Harness **${version}** for Unraid (and any Docker host).
+
+          - image: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${version}\` (also tagged \`latest\`, \`${{ needs.resolve.outputs.channel }}\`)
+          - upstream package: \`@deepseek-ai/dsh@${version}\` (node \`${{ needs.resolve.outputs.node }}\`)
+          - npm dist-tags at build time: \`${{ needs.resolve.outputs.dist_tags }}\`
+          - image digest: \`${{ needs.publish.outputs.digest }}\`
+
+          ### Install on Unraid
+          1. \`Docker → Add Container\`, paste the template URL of \`deepseek-harness.xml\` from this release, or import the file directly.
+          2. Keep \`Extra Parameters\` as shipped:
+             \`--security-opt seccomp=unconfined --security-opt systempaths=unconfined\`.
+             Unraid kernels ship without Landlock, so the bundled bubblewrap is the
+             only sandbox rung available; these two options are what let it create
+             namespaces. Without them the bash tool fails with \`SANDBOX_UNAVAILABLE\`.
+          3. Set \`PUBLIC_URL\` to the origin a reverse proxy serves (for example
+             \`https://dsh.example.com\`) when the container is exposed beyond a
+             trusted LAN.
+
+          Documentation: https://github.com/${{ github.repository }}/blob/main/README.md
+          EOF
+          gh release create "${tag}" \
+            --title "DeepSeek Harness ${version}" \
+            --notes-file dist/notes.md \
+            dist/deepseek-harness.xml \
+            templates/img/deepseek-harness.png

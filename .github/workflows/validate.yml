@@ -1,0 +1,114 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Shell syntax
+        run: |
+          set -euo pipefail
+          for file in docker/*.sh scripts/*.sh; do
+            bash -n "${file}"
+            printf 'bash -n ok: %s\n' "${file}"
+          done
+
+      - name: Shellcheck
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck --version
+          shellcheck docker/*.sh scripts/*.sh
+
+      - name: Node syntax
+        run: |
+          set -euo pipefail
+          for file in scripts/*.mjs; do
+            node --check "${file}"
+            printf 'node --check ok: %s\n' "${file}"
+          done
+
+      - name: XML, YAML and JSON well-formedness
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --disable-pip-version-check pyyaml
+          python3 - <<'PY'
+          import glob
+          import json
+          import sys
+          import xml.dom.minidom
+
+          import yaml
+
+          failures = []
+          for path in glob.glob('templates/**/*.xml', recursive=True):
+              try:
+                  xml.dom.minidom.parse(path)
+                  print(f'xml ok: {path}')
+              except Exception as error:  # noqa: BLE001
+                  failures.append(f'{path}: {error}')
+          for path in glob.glob('**/*.yml', recursive=True) + glob.glob('**/*.yaml', recursive=True):
+              try:
+                  with open(path, encoding='utf-8') as handle:
+                      yaml.safe_load(handle)
+                  print(f'yaml ok: {path}')
+              except Exception as error:  # noqa: BLE001
+                  failures.append(f'{path}: {error}')
+          for path in glob.glob('**/*.json', recursive=True):
+              try:
+                  with open(path, encoding='utf-8') as handle:
+                      json.load(handle)
+                  print(f'json ok: {path}')
+              except Exception as error:  # noqa: BLE001
+                  failures.append(f'{path}: {error}')
+          if failures:
+              print('\n'.join(failures), file=sys.stderr)
+              sys.exit(1)
+          PY
+
+      - name: Hadolint
+        run: docker run --rm -i hadolint/hadolint:latest < Dockerfile
+
+      - name: Caddy configuration
+        run: |
+          set -euo pipefail
+          for config in edge lan; do
+            docker run --rm \
+              --volume "${PWD}/docker:/caddy:ro" \
+              --env PORT=8080 \
+              --env DSH_INTERNAL_PORT=3080 \
+              --env PUBLIC_ORIGIN=https://validate.example \
+              --env DSH_UPSTREAM_HOST=validate.example \
+              --env DSH_LAUNCH_TOKEN=validate \
+              --entrypoint caddy \
+              caddy:2.11.7 validate --config "/caddy/Caddyfile.${config}" --adapter caddyfile
+            printf 'caddy validate ok: Caddyfile.%s\n' "${config}"
+          done
+
+      - name: Scripts run end to end
+        run: |
+          set -euo pipefail
+          node scripts/resolve-dsh-version.mjs --json
+          node scripts/make-icon.mjs --out=/tmp/deepseek-harness.png
+          node scripts/render-template.mjs --owner=example --out=/tmp/deepseek-harness.xml
+          python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('/tmp/deepseek-harness.xml'); print('rendered template is well-formed XML')"
+          file /tmp/deepseek-harness.png

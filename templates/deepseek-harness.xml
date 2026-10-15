@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>deepseek-harness</Name>
+  <Repository>ghcr.io/__GHCR_OWNER__/deepseek-harness:__IMAGE_TAG__</Repository>
+  <Registry>https://github.com/__GHCR_OWNER__/__REPO__/pkgs/container/deepseek-harness</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/__GHCR_OWNER__/__REPO__/issues</Support>
+  <Project>https://github.com/deepseek-ai/deepseek-harness</Project>
+  <Overview>DeepSeek Harness (DSH) 是一个"万物皆插件"的开源编码智能体：浏览器对话、模型与设置管理、会话历史，配合可在服务器上执行命令的工具链。本镜像由 Unraid 用户维护，跟随上游 npm 发版自动重建，并预装 bubblewrap —— 因为 Unraid 内核没有启用 Landlock，缺少它时 DSH 的 bash 工具会直接失败。| DeepSeek Harness (DSH) is an open-source coding agent where everything is a plugin: browser chat, model and settings management, session history, plus tools that run commands on your server. This image is maintained by an Unraid user, rebuilt automatically whenever upstream publishes (tracked from the npm registry), and ships bubblewrap because Unraid kernels have no Landlock — without it DSH's bash tool fails closed.</Overview>
+  <Category>Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/__GHCR_OWNER__/__REPO__/main/templates/img/deepseek-harness.png</Icon>
+  <ExtraParams>--security-opt seccomp=unconfined --security-opt systempaths=unconfined</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Description>DeepSeek Harness 容器镜像：上游一发布即自动重建。Web UI 在容器 8080 端口；认证由前置代理（SWAG + Authelia 等）或受信局域网承担，镜像本身不含密码登录。| DeepSeek Harness container image, rebuilt automatically whenever upstream publishes. The web UI listens on container port 8080; authentication is delegated to an edge proxy (SWAG + Authelia, etc.) or a trusted LAN — the image ships no password login of its own.</Description>
+  <Networking>
+    <Mode>bridge</Mode>
+    <Publish>
+      <Port>
+        <HostPort>8080</HostPort>
+        <ContainerPort>8080</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+    </Publish>
+  </Networking>
+  <Data>
+    <Volume>
+      <HostDir>/mnt/user/appdata/deepseek-harness/data</HostDir>
+      <ContainerDir>/data</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/mnt/user/appdata/deepseek-harness/workspace</HostDir>
+      <ContainerDir>/workspace</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+  </Data>
+  <Environment>
+    <Variable>
+      <Value>Asia/Shanghai</Value>
+      <Name>TZ</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value/>
+      <Name>PUBLIC_URL</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value/>
+      <Name>DSH_TRUSTED_HOSTS</Name>
+      <Mode/>
+    </Variable>
+  </Environment>
+  <Config Name="WebUI 端口" Target="8080" Default="8080" Mode="tcp" Description="DeepSeek Harness Web UI 的宿主端口（容器内固定为 8080）。Host port for the DeepSeek Harness web UI; the container port is always 8080." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+  <Config Name="数据目录" Target="/data" Default="/mnt/user/appdata/deepseek-harness/data" Mode="rw" Description="DSH_HOME：会话、凭据、agent home（/data/dsh）与 Caddy 状态。必须是持久化目录，否则重建容器即丢失全部会话。DSH_HOME (sessions, credentials, agents) plus Caddy state; keep it persistent." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/deepseek-harness/data</Config>
+  <Config Name="工作区" Target="/workspace" Default="/mnt/user/appdata/deepseek-harness/workspace" Mode="rw" Description="智能体的工作目录（DSH_WORKSPACE），容器启动即 cd 到此。宿主机上建议放需要长期保留的项目。The agent's working directory; the container cd's here at start." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/deepseek-harness/workspace</Config>
+  <Config Name="PUBLIC_URL" Target="PUBLIC_URL" Default="" Mode="" Description="对外访问地址的完整 origin，例如 https://dsh.example.com（不要带路径）。设置后会启用严格模式：DSH 只接受该 authority 的请求，并拒绝其它 Origin。留空 = 局域网模式：仅剥掉 Origin 并把 Host 固定为 loopback，适合受信内网或 VPN。Full origin when a reverse proxy fronts this container; leave empty for a trusted LAN." Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="DSH_TRUSTED_HOSTS" Target="DSH_TRUSTED_HOSTS" Default="" Mode="" Description="额外的可信 authority，逗号分隔（如 dsh.example.com,192.168.3.2:8080）。仅在设置了 PUBLIC_URL 时生效。Extra accepted host[:port] authorities, comma separated; only used together with PUBLIC_URL." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="时区" Target="TZ" Default="Asia/Shanghai" Mode="" Description="容器时区。Container time zone." Type="Variable" Display="advanced" Required="false" Mask="false">Asia/Shanghai</Config>
+</Container>

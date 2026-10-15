@@ -1,0 +1,99 @@
+# Caddy — edge mode. Selected by the entrypoint when PUBLIC_URL is set.
+#
+# Contract with DeepSeek Harness (see dsh-web-app / dsh-client-connection):
+#   * `dsh web` binds 127.0.0.1 and refuses wildcard addresses, so Caddy owns
+#     the published port.
+#   * DSH's browser-trust fence requires Host to be loopback, the listener bind
+#     IP, or a declared --trusted-host, and requires any attached Origin to
+#     match that Host. Here Host is rewritten to the PUBLIC_URL authority, which
+#     the entrypoint also passes as --trusted-host, so the browser's own Origin
+#     matches.
+#   * `dsh web` prints a tokenized URL; Caddy injects that token into the first
+#     navigation of `/` so the browser can mint its signed session cookie
+#     without the operator copying a URL out of the log.
+{
+	admin off
+	auto_https off
+	grace_period 10s
+}
+
+:{$PORT} {
+	header {
+		-Server
+		Content-Security-Policy "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+	}
+
+	@forwarded_https header X-Forwarded-Proto https
+	header @forwarded_https Strict-Transport-Security "max-age=31536000"
+
+	route /healthz {
+		respond "ok" 200
+	}
+
+	# The outer proxy authenticated this browser; tell the UI so it renders the
+	# settings surfaces instead of trying to authenticate natively.
+	route /dsh-deployment.js {
+		header {
+			Content-Type "application/javascript; charset=utf-8"
+			Cache-Control "no-store"
+		}
+		respond "globalThis.__DSH_AUTHENTICATED_SETTINGS__ = true;" 200
+	}
+
+	# A request carrying an Origin other than the advertised one came from
+	# somewhere else; refuse it before it reaches DSH.
+	@unexpected_origin `{http.request.header.Origin} != "" && {http.request.header.Origin} != "{$PUBLIC_ORIGIN}"`
+
+	@dsh_bootstrap {
+		path /
+		not header Cookie *dsh-auth-*
+	}
+	@native_settings_api path /api/settings.openDocument /api/settings.openSettingsDocument
+	@settings_api path /api/settings.describe /api/settings.update /api/settings.replace /api/settings.mutate /api/credentials.describe /api/credentials.set /api/credentials.unset /api/llm.discoverModels /api/settings/describe /api/settings/update /api/settings/replace /api/settings/mutate /api/credentials/describe /api/credentials/set /api/credentials/unset /api/llm/discoverModels
+
+	# Native "open this document in a desktop app" endpoints have no meaning for
+	# a browser-only deployment and would hand the page filesystem actions.
+	route @native_settings_api {
+		respond "Forbidden" 403
+	}
+
+	route @settings_api {
+		respond @unexpected_origin "Forbidden" 403
+		rewrite @dsh_bootstrap /?token={$DSH_LAUNCH_TOKEN}
+		reverse_proxy 127.0.0.1:{$DSH_INTERNAL_PORT} {
+			header_up Host {$DSH_UPSTREAM_HOST}
+			header_up -Authorization
+			header_up -Remote-User
+			header_up -X-Auth-User
+			header_up -X-Authenticated-User
+			header_up -X-Email
+			header_up -X-Forwarded-User
+			header_up -X-Roles
+			header_up -X-Remote-User
+			header_up -X-User
+			header_up -X-Webauth-User
+		}
+	}
+
+	route {
+		respond @unexpected_origin "Forbidden" 403
+		rewrite @dsh_bootstrap /?token={$DSH_LAUNCH_TOKEN}
+		reverse_proxy 127.0.0.1:{$DSH_INTERNAL_PORT} {
+			header_up Host {$DSH_UPSTREAM_HOST}
+			header_up -Authorization
+			header_up -Remote-User
+			header_up -X-Auth-User
+			header_up -X-Authenticated-User
+			header_up -X-Email
+			header_up -X-Forwarded-User
+			header_up -X-Roles
+			header_up -X-Remote-User
+			header_up -X-User
+			header_up -X-Webauth-User
+		}
+	}
+}

@@ -1,0 +1,9 @@
+.git
+.gitignore
+.github
+docs
+templates
+*.md
+!README.md
+dist
+node_modules
