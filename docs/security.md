@@ -35,6 +35,18 @@ lan 模式**没有**"对外 authority"的概念，所以它无法为公网访问
 - **注入安全响应头**：CSP、`X-Frame-Options: DENY`、`Referrer-Policy`、`X-Content-Type-Options` 等。
 - **登录引导**：把 DSH 启动时打印的一次性 token 用内部重写交给首次访问者，换取签名会话 cookie（`dsh-auth-*`）。浏览器地址栏里不会出现 token。
 
+## 谁可以连接：`ALLOWED_CLIENTS`
+
+上面两节讲的是"请求进来之后"如何判定；`ALLOWED_CLIENTS` 决定的是**请求能不能进来**，默认 `127.0.0.1`（只有本机）。
+
+- **IP / CIDR** 按连接来源地址匹配；**域名**按 `Host` 头匹配。两者可以混写：`127.0.0.1,192.168.0.0/16,dsh.example.com`。
+- **回环地址永远放行**（`127.0.0.1`、`::1` 会被自动加入），因为容器自身的健康检查就是从回环发起的——否则你把白名单写成只含域名时，容器会一直报不健康。
+- 不在白名单的请求得到 `403 Forbidden: this client is not listed in ALLOWED_CLIENTS`，不会到达 DSH。
+- 前面有反向代理时，容器看到的对端是**代理的地址**，所以要把代理地址加进白名单（此后由代理自己的鉴权决定谁能进来）；如果你想让白名单按**真实客户端 IP** 判定，再填 `TRUSTED_PROXY_CIDRS`，Caddy 就只对这些来源读取 `X-Forwarded-For`。
+  ⚠️ **不要把不可信客户端也能发起的网段填进 `TRUSTED_PROXY_CIDRS`**——那等于允许任何人伪造来源地址绕过白名单。这也是为什么它默认是空的：默认按对端地址判定，伪造不了。
+
+实现位置在 `docker/entrypoint.sh`（解析 + 生成）与 `docker/Caddyfile.{lan,edge}`（标记注入）。规则必须放在 **`handle` 块**里：实测裸 `respond` 会被后面的 `route` 抢走，而裸 `route` 又会输给 `route /healthz`——两种写法都会让外部来源**静默通过**（返回 200）。`scripts/smoke.sh` 因此专门用另一个网络上的客户端容器来断言 403/200，防止以后改坏。
+
 ## 容器本身
 
 - 以 uid/gid `1000` 运行（镜像内的非 root 账户），启动时把 `/data`、`/workspace` 的属主调整为 `1000:1000` 再降权。
