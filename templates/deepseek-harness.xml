@@ -1,19 +1,19 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>deepseek-harness</Name>
-  <Repository>ghcr.io/__GHCR_OWNER__/deepseek-harness:__IMAGE_TAG__</Repository>
-  <Registry>https://github.com/__GHCR_OWNER__/__REPO__/pkgs/container/deepseek-harness</Registry>
+  <Repository>ghcr.io/2220545672/deepseek-harness:latest</Repository>
+  <Registry>https://github.com/2220545672/deepseek-harness-unraid/pkgs/container/deepseek-harness</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/__GHCR_OWNER__/__REPO__/issues</Support>
+  <Support>https://github.com/2220545672/deepseek-harness-unraid/issues</Support>
   <Project>https://github.com/deepseek-ai/deepseek-harness</Project>
   <Overview>DeepSeek Harness (DSH) 是一个"万物皆插件"的开源编码智能体：浏览器对话、模型与设置管理、会话历史，配合可在服务器上执行命令的工具链。本镜像由 Unraid 用户维护，跟随上游 npm 发版自动重建，并预装 bubblewrap —— 因为 Unraid 内核没有启用 Landlock，缺少它时 DSH 的 bash 工具会直接失败。| DeepSeek Harness (DSH) is an open-source coding agent where everything is a plugin: browser chat, model and settings management, session history, plus tools that run commands on your server. This image is maintained by an Unraid user, rebuilt automatically whenever upstream publishes (tracked from the npm registry), and ships bubblewrap because Unraid kernels have no Landlock — without it DSH's bash tool fails closed.</Overview>
   <Category>Tools:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <TemplateURL/>
-  <Icon>https://raw.githubusercontent.com/__GHCR_OWNER__/__REPO__/main/templates/img/deepseek-harness.png</Icon>
+  <Icon>https://raw.githubusercontent.com/2220545672/deepseek-harness-unraid/main/templates/img/deepseek-harness.png</Icon>
   <ExtraParams>--security-opt seccomp=unconfined --security-opt systempaths=unconfined</ExtraParams>
   <PostArgs/>
   <CPUset/>
