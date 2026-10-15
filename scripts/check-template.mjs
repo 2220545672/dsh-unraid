@@ -145,10 +145,20 @@ const portTargets = configs.filter((c) => c.Type === 'Port').map((c) => c.Target
 if (uiPort === '') errors.push('<WebUI> has no [PORT:n] placeholder')
 else if (!portTargets.includes(uiPort)) errors.push(`<WebUI> publishes port ${uiPort} but no <Config Type="Port"> targets it (found: ${portTargets.join(', ') || 'none'})`)
 
-// 7 — volumes and paths must agree
+// 7 — v2 templates describe ports, paths and variables with <Config> entries only.
+//     The v1 <Data>/<Environment> blocks are still parsed by Unraid, so leaving
+//     them in renders a duplicate row for every path and variable in the edit page
+//     — that is how two "Container Variable: ALLOWED_CLIENTS" rows were reported.
+for (const legacy of ['Data', 'Environment']) {
+  if (new RegExp(`<${legacy}>`).test(rawXml)) {
+    errors.push(`<${legacy}> is a v1 block; v2 templates use <Config> entries only (it duplicates every row in the Unraid UI)`)
+  }
+}
+
+// 7b — if a template still carries <Data>, its volumes must agree with the Configs
 const containerPaths = volumes.map((v) => v.container).sort()
 const pathTargets = [...new Set(configs.filter((c) => c.Type === 'Path').map((c) => c.Target))].sort()
-if (containerPaths.join(',') !== pathTargets.join(',')) {
+if (volumes.length > 0 && containerPaths.join(',') !== pathTargets.join(',')) {
   errors.push(`<Data><Volume> container dirs (${containerPaths.join(', ') || 'none'}) do not match <Config Type="Path"> targets (${pathTargets.join(', ') || 'none'})`)
 }
 for (const volume of volumes) {
@@ -157,12 +167,19 @@ for (const volume of volumes) {
   if (config.Default !== volume.host) errors.push(`${volume.container}: <Volume> host dir "${volume.host}" differs from the Config default "${config.Default}"`)
   if (!volume.host.startsWith('/mnt/user/')) errors.push(`${volume.container}: host dir should live under /mnt/user (got "${volume.host}")`)
 }
+// every persistent path must still be declared, whatever the template style
+for (const target of pathTargets) {
+  const config = configs.find((c) => c.Type === 'Path' && c.Target === target)
+  if (!config.Default.startsWith('/mnt/user/')) errors.push(`${target}: Config default should live under /mnt/user (got "${config.Default}")`)
+}
 
-// 8 — variables must be declared in both places, or Unraid's GUI and the runtime disagree
+// 8 — variables are declared once, as <Config Type="Variable">
 const variableTargets = [...new Set(configs.filter((c) => c.Type === 'Variable').map((c) => c.Target))].sort()
-const envNames = [...new Set(environmentNames)].sort()
-if (variableTargets.join(',') !== envNames.join(',')) {
-  warnings.push(`<Environment> variables (${envNames.join(', ') || 'none'}) differ from <Config Type="Variable"> targets (${variableTargets.join(', ') || 'none'})`)
+if (environmentNames.length > 0) {
+  const envNames = [...new Set(environmentNames)].sort()
+  if (variableTargets.join(',') !== envNames.join(',')) {
+    warnings.push(`<Environment> variables (${envNames.join(', ') || 'none'}) differ from <Config Type="Variable"> targets (${variableTargets.join(', ') || 'none'})`)
+  }
 }
 
 // 9 — a container that needs --privileged is a red flag for review
