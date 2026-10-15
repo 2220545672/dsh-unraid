@@ -93,6 +93,11 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # bubblewrap  : second sandbox rung for kernels without Landlock (Unraid)
 # tini        : PID 1 that reaps the DSH + Caddy pair
 # git/curl/jq/ripgrep/less/procps : what an agent inside the container needs
+# openssh-client : agents deployed like ours reach the host with `ssh`; shipping
+#                  the client is also what makes git-over-ssh remotes work.
+#                  Absent here once and the whole host workflow broke, so it is
+#                  treated as a runtime requirement now.
+# unzip       : archives are a normal part of the work these agents do
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -102,9 +107,11 @@ RUN set -eux; \
         git \
         jq \
         less \
+        openssh-client \
         procps \
         ripgrep \
         tini \
+        unzip \
         util-linux; \
     rm -rf /var/lib/apt/lists/*
 
@@ -117,11 +124,19 @@ RUN set -eux; \
     chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh /usr/local/bin/caddy; \
     printf '#!/bin/sh\nexec node /app/node_modules/@deepseek-ai/dsh/lib/bin.js "$@"\n' > /usr/local/bin/dsh; \
     chmod 0755 /usr/local/bin/dsh; \
+    npm install --global --no-audit --no-fund pnpm@10; \
+    pnpm --version; \
+    rm -rf /root/.npm; \
     printf 'DSH_VERSION=%s\nCADDY_VERSION=%s\n' "${DSH_VERSION}" "${CADDY_VERSION}" > /etc/dsh-version; \
     mkdir -p /data/dsh/agents /workspace; \
     chown -R 1000:1000 /data /workspace
 
+# HOME must point at the account the container drops to: the base image leaves it
+# at /root, which uid 1000 cannot write, so `~/.ssh/config`, git config and tool
+# caches all failed until this was set. The previous community image had it right;
+# this one shipped without it once.
 ENV NODE_ENV=production \
+    HOME=/home/node \
     PORT=8080 \
     DSH_INTERNAL_PORT=3080 \
     DSH_HOME=/data/dsh \
