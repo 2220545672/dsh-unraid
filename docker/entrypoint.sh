@@ -108,6 +108,72 @@ shutdown_children() {
     rm -f "${DSH_STARTUP_LOG}" 2>/dev/null || true
 }
 
+# The bundled Caddyfiles carry two markers. ACCESS_CONTROL is replaced by the
+# rules built from ALLOWED_CLIENTS; TRUSTED_PROXIES is replaced by the Caddy
+# trusted-proxy options when TRUSTED_PROXY_CIDRS is set (and removed otherwise).
+render_caddyfile() {
+    local source="$1" target="$2" line
+    : > "${target}"
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+        case "${line}" in
+            *'# ACCESS_CONTROL'*)
+                printf '%s\n' "${ACCESS_BLOCK[@]}" >> "${target}"
+                ;;
+            *'# TRUSTED_PROXIES'*)
+                if (( ${#TRUSTED_BLOCK[@]} > 0 )); then
+                    printf '%s\n' "${TRUSTED_BLOCK[@]}" >> "${target}"
+                fi
+                ;;
+            *)
+                printf '%s\n' "${line}" >> "${target}"
+                ;;
+        esac
+    done < "${source}"
+}
+
+# ------------------------------------------------------------ access control
+
+# ALLOWED_CLIENTS — the only peers that may talk to this container. IP addresses
+# and CIDRs are matched against the peer address, hostnames against the Host
+# header. Loopback is always permitted so the bundled healthcheck keeps working
+# however the list is edited.
+ALLOWED_CLIENTS="${ALLOWED_CLIENTS:-127.0.0.1}"
+ALLOWED_IPS=("127.0.0.1" "::1")
+ALLOWED_HOSTS=()
+IFS=',' read -r -a allowed_entries <<< "${ALLOWED_CLIENTS}"
+for entry in "${allowed_entries[@]}"; do
+    entry="$(trim "${entry}")"
+    [[ -n "${entry}" ]] || continue
+    if [[ "${entry}" =~ ^[0-9A-Fa-f:.]+(/[0-9]{1,3})?$ && "${entry}" =~ [0-9] ]]; then
+        ALLOWED_IPS+=("${entry}")
+    elif [[ "${entry}" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$ ]]; then
+        ALLOWED_HOSTS+=("${entry}")
+    else
+        fatal "ALLOWED_CLIENTS entries must be IP addresses, CIDRs or hostnames (got '${entry}')"
+    fi
+done
+(( ${#ALLOWED_IPS[@]} <= 32 )) || fatal "ALLOWED_CLIENTS lists too many addresses"
+(( ${#ALLOWED_HOSTS[@]} <= 32 )) || fatal "ALLOWED_CLIENTS lists too many hostnames"
+
+# TRUSTED_PROXY_CIDRS — optional. When a reverse proxy sits in front, list its
+# addresses here and Caddy will read the real client address from
+# X-Forwarded-For *only* for connections coming from those peers. Never list a
+# range that untrusted clients can originate from: they could then forge XFF and
+# talk their way past ALLOWED_CLIENTS.
+TRUSTED_PROXY_CIDRS="${TRUSTED_PROXY_CIDRS:-}"
+TRUSTED_PROXY_LIST=()
+if [[ -n "${TRUSTED_PROXY_CIDRS}" ]]; then
+    IFS=',' read -r -a proxy_entries <<< "${TRUSTED_PROXY_CIDRS}"
+    for entry in "${proxy_entries[@]}"; do
+        entry="$(trim "${entry}")"
+        [[ -n "${entry}" ]] || continue
+        [[ "${entry}" =~ ^[0-9A-Fa-f:.]+(/[0-9]{1,3})?$ && "${entry}" =~ [0-9] ]] \
+            || fatal "TRUSTED_PROXY_CIDRS entries must be IP addresses or CIDRs (got '${entry}')"
+        TRUSTED_PROXY_LIST+=("${entry}")
+    done
+    (( ${#TRUSTED_PROXY_LIST[@]} <= 16 )) || fatal "TRUSTED_PROXY_CIDRS lists too many entries"
+fi
+
 # ---------------------------------------------------------------- validation
 
 [[ "${AUTH_MODE}" == "none" ]] || fatal "AUTH_MODE='${AUTH_MODE}' is not supported by this image; it serves no authentication of its own (set AUTH_MODE=none and authenticate at the edge: SWAG/Authelia, VPN, or a trusted LAN)"
@@ -177,6 +243,37 @@ else
     MODE="lan"
     warn "PUBLIC_URL is empty: running in lan mode (loopback Host, Origin stripped). Set PUBLIC_URL=https://dsh.example.com when a reverse proxy fronts this container"
 fi
+
+# Build the access-control rules and render the final Caddyfile from the bundled
+# template (the markers are documented in docker/Caddyfile.*).
+ACCESS_BLOCK=(
+    "	# generated from ALLOWED_CLIENTS=${ALLOWED_CLIENTS}"
+    "	@clients_denied not remote_ip ${ALLOWED_IPS[*]}"
+    '	respond @clients_denied "403 Forbidden: this client is not listed in ALLOWED_CLIENTS" 403'
+)
+if (( ${#ALLOWED_HOSTS[@]} > 0 )); then
+    ACCESS_BLOCK+=(
+        "	@host_denied not host ${ALLOWED_HOSTS[*]}"
+        '	respond @host_denied "403 Forbidden: this Host is not listed in ALLOWED_CLIENTS" 403'
+    )
+fi
+
+TRUSTED_BLOCK=()
+if (( ${#TRUSTED_PROXY_LIST[@]} > 0 )); then
+    TRUSTED_BLOCK+=(
+        "	servers {"
+        "		trusted_proxies static ${TRUSTED_PROXY_LIST[*]}"
+        "		client_ip_headers X-Forwarded-For X-Real-IP"
+        "	}"
+    )
+fi
+
+CADDY_TEMPLATE="${CADDY_CONFIG}"
+CADDY_CONFIG="${CADDY_CONFIG_HOME}/Caddyfile"
+if ! render_caddyfile "${CADDY_TEMPLATE}" "${CADDY_CONFIG}"; then
+    fatal "could not render ${CADDY_CONFIG} from ${CADDY_TEMPLATE}"
+fi
+log "access control: clients ${ALLOWED_IPS[*]}${ALLOWED_HOSTS[0]:+ ; hosts ${ALLOWED_HOSTS[*]}}${TRUSTED_PROXY_LIST[0]:+ ; trusting XFF from ${TRUSTED_PROXY_LIST[*]}}"
 
 trap shutdown_children TERM INT
 

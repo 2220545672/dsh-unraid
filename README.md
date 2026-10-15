@@ -1,35 +1,71 @@
-# dsh-unraid
+<p align="center"><img src="https://gh-proxy.com/https://raw.githubusercontent.com/2220545672/dsh-unraid/main/templates/img/dsh.png" width="128" alt="DSH for Unraid"></p>
 
-给 Unraid 用的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 容器镜像与 Community Applications 模板。
+<h1 align="center">DSH for Unraid</h1>
 
-上游一发布就自动重建、自动推送；镜像里内置 `bubblewrap`，因为 **Unraid 内核没有 Landlock**，缺了它 DSH 的 `bash` 工具会直接 fail-closed。
+<p align="center">在 Unraid 上运行 <b>DeepSeek Harness（DSH）</b> 编码智能体：浏览器界面、<b>在你的内核上真正可用的命令沙箱</b>、跟随上游自动更新。</p>
+
+<p align="center">
+  <a href="https://github.com/2220545672/dsh-unraid/actions/workflows/validate.yml"><img src="https://github.com/2220545672/dsh-unraid/actions/workflows/validate.yml/badge.svg" alt="validate"></a>
+  <img src="https://img.shields.io/badge/image-ghcr.io%2F2220545672%2Fdsh-2496ed" alt="image">
+  <img src="https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-lightgrey" alt="platforms">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
+  <a href="https://github.com/2220545672/dsh-unraid/releases"><img src="https://img.shields.io/github/v/release/2220545672/dsh-unraid?label=tracking&color=orange" alt="tracking"></a>
+</p>
+
+> **English** — An Unraid-first packaging of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): a coding agent you drive from the browser, with a `bubblewrap` sandbox that actually works on Unraid kernels (they ship without Landlock), rebuilt automatically for every upstream release, multi-arch, and with no built-in password auth — that belongs to your reverse proxy or a trusted LAN.
+
+---
+
+## 目录
+
+- [这是什么](#这是什么)
+- [功能一览](#功能一览)
+- [快速开始](#快速开始)
+- [配置](#配置)
+- [为什么还需要这个镜像](#为什么还需要这个镜像)
+- [沙箱：两个 `--security-opt` 为什么不能删](#沙箱两个---security-opt-为什么不能删)
+- [安全模型](#安全模型)
+- [更新与版本](#更新与版本)
+- [常见问题](#常见问题)
+- [测试与验证](#测试与验证)
+- [文档](#文档)
+- [支持与反馈](#支持与反馈)
+- [许可与商标](#许可与商标)
+
+## 这是什么
+
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（简称 **DSH**）是开源的编码智能体：对话、模型管理与会话历史都在浏览器里，工具链能直接在你的服务器上读写项目、执行命令，能力通过插件扩展。
+
+本仓库提供它在 Unraid 上的**打包**：一个多架构容器镜像、一份 Community Applications 模板，以及安装、沙箱原理与排障文档。
 
 ```
 ghcr.io/2220545672/dsh:latest
 ```
 
-## 为什么还要自己做一个镜像
+## 功能一览
 
-社区里已经有两个可用的打包（[runzhliu/deepseek-harness-docker](https://github.com/runzhliu/deepseek-harness-docker)、[okxlin 的运行时镜像](https://github.com/okxlin/release-factory)），本仓库存在的理由是三个具体的差异：
-
-1. **跟版信号不进坑**。`@deepseek-ai/dsh` 的 npm `latest` 标签**落后于** `alpha`：2026-10-15 实测 `latest` 仍是 `0.2.0-rc.2`，而 `alpha` 已经是 `0.2.1-alpha.3`。只读 `latest` 的流水线会**静默降级**。本仓库枚举全部已发布版本，按 semver 取最高（预发布按规范参与比较）。
-2. **默认适配 Unraid 的沙箱现实**。镜像装 `bubblewrap`，模板默认带上让它在无 Landlock 内核上真正能用的两个参数（下详）。
-3. **没有内建密码认证**。鉴权交给边缘（SWAG + Authelia、VPN、或受信局域网）：镜像里 `AUTH_MODE=none` 之外的值一律 fail-closed，避免"看起来有认证、实际很弱"的错觉。
+- **开箱可用的命令沙箱** —— Unraid 内核没有启用 Landlock，DSH 的沙箱链只剩 `bubblewrap` 一条腿。镜像内置 `bubblewrap`，模板默认带上让它在容器里真正生效的两个启动参数，因此工具不会因为"缺沙箱"而拒绝执行（详见[下文](#沙箱两个---security-opt-为什么不能删)）。
+- **跟随上游自动更新** —— 每小时检查 npm 上 `@deepseek-ai/dsh` 的最高版本，有新版本就构建、冒烟测试、推送镜像并生成版本锁定的模板；你只需在 Docker 页点一次更新。
+- **多架构** —— `linux/amd64` 与 `linux/arm64` 同时发布，附 SBOM 与 provenance 证明。
+- **收敛的运行时** —— 以非 root（uid 1000）运行，不挂载 docker socket，不接触 `/boot`，模板里不要求任何密钥。
+- **鉴权交给边缘** —— 镜像不含密码登录，配合 SWAG + Authelia、VPN 或受信内网使用；容器自身仍强制 Host/Origin 校验与安全响应头。
+- **中英文文档** —— 安装、沙箱原理、迁移与排障都在 [`docs/`](docs/)。
 
 ## 快速开始
 
-### Unraid（推荐）
+### 方式一：Community Applications（收录后）
 
-- 有 CA 收录后：`Apps` 里搜 `DSH`（描述里含 “DeepSeek Harness”，搜 `deepseek` 也能命中）。
-- 未收录时：`Docker → Add Container`，把 [`templates/dsh.xml`](templates/dsh.xml) 导入（或直接把内容粘进模板编辑器），然后 **不要删掉 `Extra Parameters`**。
+`Apps` 里搜 **DSH**（描述含 "DeepSeek Harness"，搜 `deepseek` 也能命中），安装后按需修改端口与路径即可。
 
-创建后容器的 `Extra Parameters` 应为：
+### 方式二：Unraid `Docker → Add Container`（现在就能用）
+
+把 [`templates/dsh.xml`](templates/dsh.xml) 的内容粘进模板编辑器（或导入该文件），**不要删掉 `Extra Parameters`**：
 
 ```
 --security-opt seccomp=unconfined --security-opt systempaths=unconfined
 ```
 
-### Docker Compose
+### 方式三：Docker Compose
 
 ```bash
 git clone https://github.com/2220545672/dsh-unraid.git
@@ -37,7 +73,7 @@ cd dsh-unraid
 DSH_IMAGE=ghcr.io/2220545672/dsh:latest PUBLIC_URL=https://dsh.example.com docker compose up -d
 ```
 
-### docker run
+### 方式四：docker run
 
 ```bash
 docker run -d --name dsh --restart unless-stopped \
@@ -51,101 +87,124 @@ docker run -d --name dsh --restart unless-stopped \
   ghcr.io/2220545672/dsh:latest
 ```
 
-浏览器打开 `http://<host>:8080`。首次访问会经由 Caddy 注入 DSH 的启动 token，自动换取签名会话 cookie —— **不需要**从日志里复制带 token 的 URL。
+浏览器打开 `http://<你的服务器>:8080`。**首次访问不需要从日志里复制带 token 的 URL** —— Caddy 会自动把 DSH 的启动 token 换成签名会话 cookie。
 
-## 端口、卷与环境变量
+## 配置
 
 | 名称 | 默认 | 说明 |
 |---|---|---|
-| `8080`（容器端口） | — | 唯一的发布端口，由 Caddy 监听；DSH 自己只绑 `127.0.0.1:3080`（`dsh web` 拒绝通配地址） |
-| `/data` | — | `DSH_HOME`（会话、凭据）+ `/data/dsh/agents` + Caddy 状态。**必须持久化**，否则重建容器就丢会话 |
-| `/workspace` | — | 智能体工作目录（`DSH_WORKSPACE`），启动即 `cd` 到此 |
-| `PUBLIC_URL` | 空 | 对外 origin，如 `https://dsh.example.com`。设置后进入 **edge 模式**；留空为 **lan 模式** |
-| `DSH_TRUSTED_HOSTS` | 空 | 额外的可信 authority，逗号分隔；仅 edge 模式生效 |
-| `TZ` | `Asia/Shanghai` | 时区 |
-| `AUTH_MODE` | `none` | 唯一支持的值；其它值容器启动即报错退出 |
+| `8080`（容器端口） | — | 唯一需要发布的端口，由 Caddy 监听。DSH 自己只绑 `127.0.0.1:3080`（`dsh web` 拒绝通配地址，所以前面必须有一层代理） |
+| `/data` | — | `DSH_HOME`：会话、凭据、agent home 与 Caddy 状态。**必须持久化**，否则重建容器即丢会话 |
+| `/workspace` | — | 智能体工作目录（`DSH_WORKSPACE`），启动后即在此工作 |
+| `PUBLIC_URL` | 空 | 对外 origin，例如 `https://dsh.example.com`（只填协议+主机名，不要带路径）。设置后进入 **edge 模式**；留空为 **lan 模式** |
+| `DSH_TRUSTED_HOSTS` | 空 | 额外可信的 authority，逗号分隔（如 `dsh.example.com,192.168.1.10:8080`），仅 edge 模式生效 |
+| `TZ` | `Asia/Shanghai` | 容器时区 |
+| `AUTH_MODE` | `none` | 唯一支持的值；填其它值容器会启动失败并说明原因 |
 
-卷的属主会被启动脚本改成 `1000:1000`（镜像内的 `node` 账户），**不要**按 Unraid 习惯改成 `99:100`。
+> **卷属主**：启动脚本会把两个卷改成 `1000:1000`（镜像内的 `node` 账户）。**不要**按 Unraid 习惯改成 `99:100`，否则容器无权访问自己的数据。
 
-### 两种模式的安全语义
+## 为什么还需要这个镜像
 
-DSH 自己有一道"浏览器信任栅栏"（`dsh-client-connection`）：Host 必须是 loopback / 监听绑定 IP / 显式 `--trusted-host`，若请求带 `Origin` 则必须与该 Host 同源，且 `Sec-Fetch-Site: cross-site` 一律拒绝。本镜像据此分两种模式：
+社区里已有其它 DSH 打包（[runzhliu/deepseek-harness-docker](https://github.com/runzhliu/deepseek-harness-docker)、[okxlin 的运行时镜像](https://github.com/okxlin/release-factory)）。本仓库的差异是三个具体问题：
 
-- **edge 模式**（设了 `PUBLIC_URL`）：Caddy 把 Host 改写成该 authority（同时作为 `--trusted-host` 传给 DSH），保留 `Origin` 并额外拒绝不等于 `PUBLIC_URL` 的 Origin。适合 SWAG + Authelia 这类前置鉴权。
-- **lan 模式**（`PUBLIC_URL` 为空）：Caddy 把 Host 固定为 loopback 并**剥掉 `Origin`**。防 DNS rebinding 与防跨站两条防线仍然有效（rebinding 伪造不了 Host；跨站请求由 `Sec-Fetch-Site` 规则拦下），但**不要**把 lan 模式直接暴露到公网。
-
-两种模式都会：把 `/api/settings.openDocument`、`/api/settings.openSettingsDocument` 这类"在桌面端打开文件"的端点返回 403，并注入安全响应头（CSP、`X-Frame-Options: DENY` 等）。
+1. **跟版信号不能踩坑。** `@deepseek-ai/dsh` 的 npm `latest` 标签会**落后于** `alpha`：2026-10-15 实测 `latest` 仍是 `0.2.0-rc.2`，而 `alpha` 已是 `0.2.1-alpha.3`。只读 `latest` 的流水线会**静默降级**。本仓库枚举全部已发布版本，按 semver 取最高（预发布按规范参与比较）。
+2. **默认适配 Unraid 的沙箱现实。** 见下一节。
+3. **不做"看起来有认证"的假象。** 镜像里除 `AUTH_MODE=none` 以外的取值一律 fail-closed，鉴权明确交给边缘。
 
 ## 沙箱：两个 `--security-opt` 为什么不能删
 
-简短版：Unraid 内核没编 Landlock，DSH 的沙箱链只剩 `bwrap` 一条腿；而 `bwrap` 在容器里要建命名空间，必须放开 seccomp 的 `unshare` 与 `/proc` 掩码。缺任何一个，`bash` 工具就完全不可用——唯一的替代是 `danger-full-access`（无沙箱、无审批），比这更糟。
-
-完整的证据、对照实验与验证命令见 **[docs/unraid-sandbox.md](docs/unraid-sandbox.md)**。
-
-## 自动跟版是怎么工作的
+DSH 的命令执行沙箱按 `bwrap → landlock` 顺序选择后端。Unraid 内核没有编译 Landlock（`landlock_create_ruleset` 返回 `ENOSYS`），于是只剩 `bubblewrap`；而 `bwrap` 要在容器里创建命名空间，必须放开 seccomp 的 `unshare` 系列调用与 `/proc` 掩码：
 
 ```
-cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（含 alpha/rc）
-                    ├─ 已有 dsh-<version> 标签 → 什么都不做
-                    └─ 新版本 → 构建 amd64 → 冒烟测试 → 构建并推送 amd64+arm64
-                                → 打标签 dsh-<version> → 发 GitHub Release（附版本锁定的模板 XML）
+--security-opt seccomp=unconfined --security-opt systempaths=unconfined
 ```
 
-- **标签策略**：`:<version>`（不可变）、`:latest`（始终指向最新，含预发布）、以及通道标签 `:alpha` / `:rc` / `:stable`。
-- **冒烟测试**（`scripts/smoke.sh`）逐项断言：`/healthz` 返回 `ok`、`/` 返回 303 且下发 `dsh-auth-*` cookie、跨站 `/api` 请求被 403、受管端点被 403、两个 Caddyfile 都能 `caddy validate`、镜像内有可用的 `bwrap`。
-- **手动触发**：Actions → `release` → `Run workflow`，可指定精确版本或 `force=true` 强制重建。
+**缺任何一个，`bash` 工具都完全不可用**（fail-closed 报 `SANDBOX_UNAVAILABLE`），唯一的替代是 `danger-full-access`（无沙箱、无审批），比这更糟。
 
-## 已知限制
+完整证据、对照实验与自查命令见 **[docs/unraid-sandbox.md](docs/unraid-sandbox.md)**。
 
-- **没有内建认证**。必须在边缘或受信网络里解决；`AUTH_MODE` 只接受 `none`。
-- **arm64 未在真机验证**。CI 会构建并推送 `linux/arm64`，但没有在 ARM 设备上跑过；遇到问题请开 issue。
-- **`Extra Parameters` 放宽了容器外层**（`seccomp` / `systempaths` 各一项）。这是为了换取内层真正有效的沙箱，取舍见上文那篇文档。
-- **首次发布后需要手动把 GHCR 包设为 public**（GitHub 默认私有）：`GitHub → 个人头像 → Packages → dsh → Package settings → Change visibility`。否则 Unraid 上 `docker pull` 会 401。
-- 上游 DSH 仍在 alpha/rc 阶段，接口与行为都可能变；`:latest` 会跟着它走。
-- **镜像解压后约 1.09 GB**（node 运行时 + Caddy + git/ripgrep 等工具 + DSH 的依赖树）。docker.img 落在机械盘上的机器，首次拉取会明显偏慢。
-- **国内直连 `ghcr.io` 可能很慢**：实测（中国大陆家宽）首次拉取约 **1 MB/s、约 20 分钟**（1.09 GB，未登录匿名拉取，能成功但不受镜像源加速——那些源只覆盖 Docker Hub）。若嫌慢，可在宿主给 dockerd 配代理，或改成从你信任的镜像/中转拉取。
+## 安全模型
 
-## 图标与商标
+DSH 自身有一道"浏览器信任栅栏"：请求的 `Host` 必须是 loopback、监听绑定地址或显式声明的 `--trusted-host`；若带 `Origin` 则必须与 Host 同源；`Sec-Fetch-Site: cross-site` 的请求一律拒绝。本镜像据此提供两种模式：
 
-- 图标由 `scripts/make-icon.mjs` 合成：DSH 的蓝色鲸鱼（取自上游 `website/public/favicon.svg）+ 右下角**面积 1/16** 的 Unraid 圆角角标（取自 `unraid/docs` 的官方 mark）。素材出处与商标说明见 [templates/img/src/README.md](templates/img/src/README.md)。
-- 本仓库是**社区打包**，与 DeepSeek（深度求索）及 Lime Technology 均无隶属、合作或授权关系。命名遵循 DSH 官方品牌规范：项目名用缩写 **DSH**，只有在描述性文字里才出现 "DeepSeek Harness"。
-- **图标宿主必须国内可达**。实测：`raw.githubusercontent.com` 与 `cdn.jsdelivr.net` **超时**，`github.com/.../raw/...` 会 302 跳到 raw（随后一样超时）；`gh-proxy.com` 约 0.2s、`ghproxy.net` 约 1.0–1.9s，两者字节经 sha256 校验与正本一致。模板的 `<Icon>` 因此指向 `gh-proxy.com`，换宿主只需改这一行。
+- **edge 模式**（设置了 `PUBLIC_URL`）：Caddy 把 `Host` 改写成该 authority 并作为 `--trusted-host` 传给 DSH，同时拒绝任何 Origin 不等于 `PUBLIC_URL` 的请求。适合 SWAG + Authelia 这类前置鉴权。
+- **lan 模式**（`PUBLIC_URL` 留空）：Caddy 把 `Host` 固定为 loopback 并**剥掉** `Origin`。防 DNS rebinding 与防跨站两条防线仍然有效，但**不要**把 lan 模式直接暴露到公网。
 
-## 验证记录（可复现）
+两种模式都会把"在桌面端打开文件"这类端点（`/api/settings.openDocument` 等）返回 403，并注入安全响应头（CSP、`X-Frame-Options: DENY` 等）。
 
-| 项目 | 证据 |
+## 更新与版本
+
+镜像**自动跟版**：上游一发新版就重建、冒烟测试并推送，同时打上 `dsh-<版本>` 标签并生成 Release（附**版本锁定**的模板 XML，供需要可复现部署的人使用）。
+
+| 标签 | 含义 |
 |---|---|
-| 多架构发布 | index digest `sha256:a357c91a2f4f86b3ffb6f978017773d2e37684eddcc5e5d9d009f09eb84ce7ab`，`linux/amd64` + `linux/arm64`，另有 2 个 SBOM/provenance attestation manifest |
-| 匿名拉取 | 在 Unraid 宿主上未登录 `docker pull ghcr.io/2220545672/dsh:latest` 成功，digest 与上表一致 |
-| CI 冒烟（每次发版都跑） | lan 模式：`/healthz`=ok、`/` 返回 303 + `dsh-auth-*`、跨站 `/api` 403、受管端点 403、两个 Caddyfile `caddy validate`、容器内 `bwrap` 可用；edge 模式：容器起得来、外来 Origin 403、声明 Origin 可达 DSH |
-| **目标平台验收**（2026-10-15，Unraid 7.3.2 / 内核 `6.18.38-Unraid`） | edge 模式（`PUBLIC_URL` 已设）启动 → `/healthz` = ok；`/` 返回 **303** 且下发 `dsh-auth-*` cookie；容器内 `bwrap … -- /bin/sh -c 'echo SANDBOX_OK'` 输出 **SANDBOX_OK**；验收实例使用独立端口与临时卷，未触碰宿主上正在运行的其他容器 |
-| 图标可达性 | 经 `gh-proxy.com` 取回 8658 B，sha256 `fb9b0e37…` 与本地正本一致 |
-| 模板自检 | `node scripts/check-template.mjs templates/dsh.xml`：CA 的 minimum/recommended 字段齐全、`ca_profile.xml` 的 `<Profile>` 非空、卷与 `Config` 的宿主机路径一致 |
+| `:<版本>`（如 `:0.2.1-alpha.3`） | 不可变，适合固定版本 |
+| `:latest` | 始终指向最新（含预发布） |
+| `:alpha` / `:rc` / `:stable` | 按上游发布通道跟随 |
 
-> 目标平台验收这一步抓出过一个 CI 漏掉的真实 bug：镜像里 token 正则把端口写死成内部端口，而 **edge 模式**下 DSH 按 `--public-url` 打印对外端口 → 正则永不匹配 → Caddy 不启动、界面打不开。修复已在 `:latest`（宽松匹配）并补进 CI 的 edge 模式冒烟断言。
+在 Unraid 上更新：Docker 页 → 该容器 → **force update**（或等它提示 apply update）。不需要改任何配置；`/data` 与 `/workspace` 里的内容保持不变。
 
-## 维护者手册
+## 常见问题
 
-| 想做的事 | 怎么做 |
+**界面打不开 / 一直转圈**
+先看 `docker logs dsh | head -30`：entrypoint 会写明运行模式（edge / lan）、上游版本与启动结果。再确认 `PUBLIC_URL` 与你实际访问的地址一致（协议 + 主机名，不能带路径或结尾斜杠）。
+
+**命令工具报 `SANDBOX_UNAVAILABLE`**
+`Extra Parameters` 里的两个 `--security-opt` 被删掉了，恢复即可。原理见 [docs/unraid-sandbox.md](docs/unraid-sandbox.md)。
+
+**8080 端口被占用**
+改模板里的端口映射（宿主端口可任意，容器端口保持 8080）。
+
+**升级后界面没变化**
+Unraid 只有在镜像 digest 变化时才会重建容器；先在 Docker 页点 **force update**，再 `docker inspect` 确认镜像 digest 是否更新。
+
+**放在反向代理后面该怎么配**
+设 `PUBLIC_URL=https://你的域名`，反代指到 `容器名:8080`。若反代会改写 Host（SWAG 默认会），无需额外配置；若你的反代改用了别的 authority，用 `DSH_TRUSTED_HOSTS` 补上。
+
+**数据在哪？怎么备份？**
+会话与凭据在 `/data`（默认 `appdata/dsh/data`），项目在 `/workspace`（默认 `appdata/dsh/workspace`）。备份这两个目录即可，升级/重建容器不影响它们。
+
+**为什么容器用 uid 1000 而不是 Unraid 常见的 `99:100`？**
+镜像以固定的非 root 账户运行，启动时会把卷 chown 成 `1000:1000` 并降权。这样沙箱与文件权限的行为在任何宿主上都一致。
+
+**支持 arm64 吗？**
+支持，CI 会构建并推送 `linux/arm64`，但**尚未在 ARM 真机上跑过**；遇到问题欢迎开 issue。
+
+**上游还在预发布阶段吗？**
+是。`:latest` 会跟随上游的预发布版本；需要稳定可固定到具体的 `:<版本>` 标签。
+
+## 测试与验证
+
+每次发布前，镜像都会在 CI 里真实启动并通过冒烟断言；仓库本身另有一道静态闸门（`scripts/check-static.sh`，`validate` 与 `release` 两个工作流共用，因此**检查不过的提交不可能发布出镜像或 Release 资产**）。
+
+| 验证项 | 内容 |
 |---|---|
-| 本地构建 | `docker build --build-arg DSH_VERSION=0.2.1-alpha.3 --build-arg NODE_VERSION=24.21.0 --build-arg CADDY_VERSION=2.11.7 -t dsh:local .` |
-| 本地冒烟 | `bash scripts/smoke.sh dsh:local` |
-| 查上游版本解析结果 | `node scripts/resolve-dsh-version.mjs --json` |
-| 改图标（PNG，供 Docker 模板用） | `node scripts/make-icon.mjs`（需要 `sharp`；素材在 `templates/img/src/`），提交生成的 `templates/img/dsh.png` |
-| 改图标（矢量 `icon.svg`，CA 仓库布局要求） | `node scripts/make-icon-svg.mjs`（无依赖）；CI 会重跑并与提交内容 diff，禁止手改 |
-| 提交前自检 | `bash scripts/check-static.sh` —— validate 与 release 两个工作流**共用**这道闸门（语法、XML/YAML/JSON、CA 布局与模板门槛、图标可复现），所以检查失败的提交不可能发布出镜像或 Release 资产 |
-| 改模板 | 编辑 `templates/dsh.xml`（owner/repo/tag 已渲染为本仓库的值；fork 后用 `scripts/render-template.mjs` 重新渲染） |
-| **首次发布** | 见 [docs/publish.md](docs/publish.md)：建仓库 → 推送 → 两个仓库设置（Workflow permissions 必须为 read/write、首发后把 GHCR 包设为 public）→ 手动触发一次 release |
-| 提交到 CA | 见 [docs/ca-submission.md](docs/ca-submission.md)（官方硬性门槛：`ca_profile.xml`、LICENSE、Validate/Scan）与 [docs/ca-pitfalls.md](docs/ca-pitfalls.md)（前人踩过的坑：声明不符被下架、废弃失去安全更新、模板改动不回流、中心 feed 停摆……） |
-| 模板自检 | `node scripts/check-template.mjs templates/dsh.xml`（validate 与 release 都会跑；含 CA 的 minimum/recommended 字段与 `ca_profile.xml` 门槛） |
-| 迁移现有部署 | 见 [docs/migrate-from-another-image.md](docs/migrate-from-another-image.md)：从其它 DSH 镜像（如 okxlin 的 `dsh-web`）切到本镜像，含"容器名变了要让反代跟着改"与最小中断步骤 |
+| CI 冒烟（每次发版） | lan 模式：`/healthz` = ok、`/` 返回 303 且下发 `dsh-auth-*`、跨站 `/api` 被 403、受管端点被 403、两个 Caddyfile 通过 `caddy validate`、容器内 `bwrap` 可用；edge 模式：容器起得来、外来 Origin 被 403、声明的 Origin 可达 DSH |
+| 目标平台验收 | 在 Unraid 7.3.2 / 内核 `6.18.38-Unraid` 上：edge 模式启动 → `/healthz` = ok → `/` 返回 **303** 且下发 `dsh-auth-*` cookie → 容器内 `bwrap … echo SANDBOX_OK` 输出 **SANDBOX_OK** |
+| 发布物 | 多架构 index（amd64 + arm64）与 SBOM/provenance；未登录匿名 `docker pull` 实测成功 |
+| 模板与仓库 | CA 的 minimum/recommended 字段、`ca_profile.xml` 门槛、卷与 `Config` 路径一致性、图标可复现，均由闸门断言 |
 
-## English summary
+> 目标平台验收曾抓出一个 CI 漏掉的真实缺陷：token 匹配把端口写死成内部端口，而 edge 模式下 DSH 按对外地址打印，导致 Caddy 不启动、界面打不开。修复后已把 edge 模式断言补进 CI。
 
-An Unraid-first DeepSeek Harness image: multi-arch, rebuilt automatically from the newest version published on npm (prereleases included, because the `latest` dist-tag lags behind `alpha`), shipping `bubblewrap` plus the two `--security-opt` values it needs on Landlock-less kernels, with no built-in password auth — authentication belongs to an edge proxy or a trusted LAN. See [docs/unraid-sandbox.md](docs/unraid-sandbox.md) for the sandbox rationale and [docs/ca-submission.md](docs/ca-submission.md) for the Community Applications workflow.
+## 文档
 
-## License
+| 文档 | 内容 |
+|---|---|
+| [docs/unraid-sandbox.md](docs/unraid-sandbox.md) | 沙箱原理、对照实验与自查命令 |
+| [docs/migrate-from-another-image.md](docs/migrate-from-another-image.md) | 从其它 DSH 镜像迁移过来（含"容器名变了要让反代跟着改"与最小中断步骤） |
+| [docs/ca-submission.md](docs/ca-submission.md) | Community Applications 的提交门槛与流程 |
+| [docs/ca-pitfalls.md](docs/ca-pitfalls.md) | CA 生态里前人踩过的坑（下架、废弃、模板不回流……） |
+| [docs/publish.md](docs/publish.md) | 如何发布这个仓库（fork 后用） |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 本地构建、自检、发版与图标生成 |
 
-MIT（见 [LICENSE](LICENSE)）。DeepSeek Harness 本身由 DeepSeek 以 MIT 许可发布，本仓库只做打包；仓库里的图标是原创合成作品，素材出处见 [templates/img/src/README.md](templates/img/src/README.md)。
+## 支持与反馈
 
-> `LICENSE` 保持逐字 MIT 正文不带附加段落，这样 GitHub 与各类扫描器才能识别为 **MIT**（曾因追加说明被识别成 "Other"，会挡住 Community Applications 的许可证要求）。
+- **Bug / 功能请求**：[GitHub Issues](https://github.com/2220545672/dsh-unraid/issues)。
+- 提问时请附上：`docker logs <容器名> | head -30` 的输出、Unraid 版本、内核版本（`uname -r`）、以及你的 `PUBLIC_URL` 设置（隐去域名）。
+- 上游 DSH 自身的问题（模型、插件、界面行为）请提到 [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)。
+
+## 许可与商标
+
+- 本仓库内容以 **MIT** 许可发布，见 [LICENSE](LICENSE)。DeepSeek Harness 本身由 DeepSeek 以 MIT 许可发布，本仓库只做打包。
+- 图标为原创合成作品：DSH 官方标记 + Unraid 官方标记的组合，素材出处与商标说明见 [templates/img/src/README.md](templates/img/src/README.md)。
+- 本仓库是**社区打包**，与 DeepSeek（深度求索）及 Lime Technology 均无隶属、合作或授权关系。命名遵循 DSH 官方品牌规范：项目名使用缩写 **DSH**，`DeepSeek Harness` 仅出现在描述性文字中。
