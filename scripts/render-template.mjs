@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Render templates/deepseek-harness.xml into a publishable Unraid template.
+ * Render templates/dsh.xml into a publishable Unraid template.
  *
  * The template is the only artifact that has to name a concrete registry
  * namespace, so the repository stays namespace-free and the release workflow
@@ -14,7 +14,7 @@
  *
  * Usage:
  *   node scripts/render-template.mjs --owner=meixu --tag=0.2.1-alpha.3 \
- *     --version=0.2.1-alpha.3 --repo=deepseek-harness-unraid --out=dist/deepseek-harness.xml
+ *     --version=0.2.1-alpha.3 --repo=dsh-unraid --out=dist/dsh.xml
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
@@ -29,11 +29,11 @@ const flag = (name, fallback) => {
 }
 
 const owner = flag('owner', process.env.GITHUB_REPOSITORY_OWNER ?? '')
-const repo = flag('repo', process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'deepseek-harness-unraid')
+const repo = flag('repo', process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'dsh-unraid')
 const tag = flag('tag', 'latest')
 const version = flag('version', tag)
-const source = resolve(flag('template', 'templates/deepseek-harness.xml'))
-const out = resolve(flag('out', 'dist/deepseek-harness.xml'))
+const source = resolve(flag('template', 'templates/dsh.xml'))
+const out = resolve(flag('out', 'dist/dsh.xml'))
 const year = flag('year', String(new Date().getUTCFullYear()))
 
 if (owner === '') {

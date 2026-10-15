@@ -44,7 +44,7 @@ CADDY_DIR="/etc/caddy"
 CADDY_CONFIG_HOME="${DSH_HOME%/dsh}/caddy/config"
 CADDY_DATA_HOME="${DSH_HOME%/dsh}/caddy/data"
 DSH_STARTUP_LOG="${TMPDIR:-/tmp}/dsh-startup-$$.log"
-DSH_VERSION_FILE="/etc/deepseek-harness-version"
+DSH_VERSION_FILE="/etc/dsh-version"
 
 DSH_PID=""
 CADDY_PID=""

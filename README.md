@@ -1,11 +1,11 @@
-# deepseek-harness-unraid
+# dsh-unraid
 
 给 Unraid 用的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 容器镜像与 Community Applications 模板。
 
 上游一发布就自动重建、自动推送；镜像里内置 `bubblewrap`，因为 **Unraid 内核没有 Landlock**，缺了它 DSH 的 `bash` 工具会直接 fail-closed。
 
 ```
-ghcr.io/__GHCR_OWNER__/deepseek-harness:latest
+ghcr.io/__GHCR_OWNER__/dsh:latest
 ```
 
 ## 为什么还要自己做一个镜像
@@ -20,8 +20,8 @@ ghcr.io/__GHCR_OWNER__/deepseek-harness:latest
 
 ### Unraid（推荐）
 
-- 有 CA 收录后：`Apps` 里搜 `deepseek-harness`。
-- 未收录时：`Docker → Add Container`，把 [`templates/deepseek-harness.xml`](templates/deepseek-harness.xml) 导入（或直接把内容粘进模板编辑器），然后 **不要删掉 `Extra Parameters`**。
+- 有 CA 收录后：`Apps` 里搜 `DSH`（描述里含 “DeepSeek Harness”，搜 `deepseek` 也能命中）。
+- 未收录时：`Docker → Add Container`，把 [`templates/dsh.xml`](templates/dsh.xml) 导入（或直接把内容粘进模板编辑器），然后 **不要删掉 `Extra Parameters`**。
 
 创建后容器的 `Extra Parameters` 应为：
 
@@ -32,23 +32,23 @@ ghcr.io/__GHCR_OWNER__/deepseek-harness:latest
 ### Docker Compose
 
 ```bash
-git clone https://github.com/__GHCR_OWNER__/deepseek-harness-unraid.git
-cd deepseek-harness-unraid
-DSH_IMAGE=ghcr.io/__GHCR_OWNER__/deepseek-harness:latest PUBLIC_URL=https://dsh.example.com docker compose up -d
+git clone https://github.com/__GHCR_OWNER__/dsh-unraid.git
+cd dsh-unraid
+DSH_IMAGE=ghcr.io/__GHCR_OWNER__/dsh:latest PUBLIC_URL=https://dsh.example.com docker compose up -d
 ```
 
 ### docker run
 
 ```bash
-docker run -d --name deepseek-harness --restart unless-stopped \
+docker run -d --name dsh --restart unless-stopped \
   -p 8080:8080 \
   -e TZ=Asia/Shanghai \
   -e PUBLIC_URL=https://dsh.example.com \
-  -v /mnt/user/appdata/deepseek-harness/data:/data \
-  -v /mnt/user/appdata/deepseek-harness/workspace:/workspace \
+  -v /mnt/user/appdata/dsh/data:/data \
+  -v /mnt/user/appdata/dsh/workspace:/workspace \
   --security-opt seccomp=unconfined \
   --security-opt systempaths=unconfined \
-  ghcr.io/__GHCR_OWNER__/deepseek-harness:latest
+  ghcr.io/__GHCR_OWNER__/dsh:latest
 ```
 
 浏览器打开 `http://<host>:8080`。首次访问会经由 Caddy 注入 DSH 的启动 token，自动换取签名会话 cookie —— **不需要**从日志里复制带 token 的 URL。
@@ -100,8 +100,14 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 - **没有内建认证**。必须在边缘或受信网络里解决；`AUTH_MODE` 只接受 `none`。
 - **arm64 未在真机验证**。CI 会构建并推送 `linux/arm64`，但没有在 ARM 设备上跑过；遇到问题请开 issue。
 - **`Extra Parameters` 放宽了容器外层**（`seccomp` / `systempaths` 各一项）。这是为了换取内层真正有效的沙箱，取舍见上文那篇文档。
-- **首次发布后需要手动把 GHCR 包设为 public**（GitHub 默认私有）：`GitHub → 个人头像 → Packages → deepseek-harness → Package settings → Change visibility`。否则 Unraid 上 `docker pull` 会 401。
+- **首次发布后需要手动把 GHCR 包设为 public**（GitHub 默认私有）：`GitHub → 个人头像 → Packages → dsh → Package settings → Change visibility`。否则 Unraid 上 `docker pull` 会 401。
 - 上游 DSH 仍在 alpha/rc 阶段，接口与行为都可能变；`:latest` 会跟着它走。
+
+## 图标与商标
+
+- 图标由 `scripts/make-icon.mjs` 合成：DSH 的蓝色鲸鱼（取自上游 `website/public/favicon.svg）+ 右下角**面积 1/16** 的 Unraid 圆角角标（取自 `unraid/docs` 的官方 mark）。素材出处与商标说明见 [templates/img/src/README.md](templates/img/src/README.md)。
+- 本仓库是**社区打包**，与 DeepSeek（深度求索）及 Lime Technology 均无隶属、合作或授权关系。命名遵循 DSH 官方品牌规范：项目名用缩写 **DSH**，只有在描述性文字里才出现 "DeepSeek Harness"。
+- **图标宿主必须国内可达**。实测：`raw.githubusercontent.com` 与 `cdn.jsdelivr.net` **超时**，`github.com/.../raw/...` 会 302 跳到 raw（随后一样超时）；`gh-proxy.com` 约 0.2s、`ghproxy.net` 约 1.0–1.9s，两者字节经 sha256 校验与正本一致。模板的 `<Icon>` 因此指向 `gh-proxy.com`，换宿主只需改这一行。
 
 ## 维护者手册
 
@@ -110,8 +116,8 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 | 本地构建 | `docker build --build-arg DSH_VERSION=0.2.1-alpha.3 --build-arg NODE_VERSION=24.21.0 --build-arg CADDY_VERSION=2.11.7 -t dsh:local .` |
 | 本地冒烟 | `bash scripts/smoke.sh dsh:local` |
 | 查上游版本解析结果 | `node scripts/resolve-dsh-version.mjs --json` |
-| 改图标 | `node scripts/make-icon.mjs`（无第三方依赖，纯 zlib 写 PNG），然后提交 |
-| 改模板 | 编辑 `templates/deepseek-harness.xml`；`__GHCR_OWNER__` / `__REPO__` / `__IMAGE_TAG__` 由 `scripts/render-template.mjs` 渲染 |
+| 改图标 | `node scripts/make-icon.mjs`（需要 `sharp`；素材在 `templates/img/src/`），提交生成的 `templates/img/dsh.png` |
+| 改模板 | 编辑 `templates/dsh.xml`；`__GHCR_OWNER__` / `__REPO__` / `__IMAGE_TAG__` 由 `scripts/render-template.mjs` 渲染 |
 | **首次发布** | 见 [docs/publish.md](docs/publish.md)：建仓库 → 推送 → 两个仓库设置（Workflow permissions 必须为 read/write、首发后把 GHCR 包设为 public）→ 手动触发一次 release |
 | 提交到 CA | 见 [docs/ca-submission.md](docs/ca-submission.md)（老仓库已停止收新模板，现在走仓库 claim） |
 

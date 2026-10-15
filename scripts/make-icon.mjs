@@ -1,15 +1,30 @@
 #!/usr/bin/env node
 /**
- * Generate templates/img/deepseek-harness.png (256x256, RGBA) without any image
- * dependency: raw PNG chunks + zlib deflate, one rounded tile with a chevron.
+ * Compose the Unraid app icon: the DSH mark as the main subject, with a small
+ * Unraid badge in the bottom-right corner.
  *
- * Community Applications wants a square icon reachable by URL; committing a
- * generated file keeps the repository self-contained.
+ * Layout (defaults, in a 256x256 canvas):
+ *   - DSH mark (blue whale) contained in 94% of the canvas, centred, transparent
+ *     background so the icon works on any Community Applications card colour.
+ *   - Unraid badge: a 64x64 rounded square — 1/16 of the canvas *area* — inset
+ *     10px from the bottom-right corner, radius 14px, white tile with a hairline
+ *     border and a soft drop shadow.
  *
- * Usage: node scripts/make-icon.mjs [--out=templates/img/deepseek-harness.png] [--size=256]
+ * Sources live in templates/img/src/ (see the README there for provenance and
+ * the trademark note). Rasterisation needs sharp, which is deliberately NOT a
+ * dependency of this repository: the generated PNG is committed, so the icon
+ * does not depend on a working toolchain at release time.
+ *
+ * Usage:
+ *   node scripts/make-icon.mjs [--size=256] [--out=templates/img/dsh.png]
+ *                              [--badge=64] [--inset=10] [--radius=14]
+ *                              [--sharp=/path/to/sharp] [--flatten=#rrggbb]
+ *
+ * --flatten renders the icon on a solid colour instead of transparency, which is
+ * handy for eyeballing how it reads on a light or dark card.
  */
-import { deflateSync } from 'node:zlib'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile, access } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 
@@ -22,119 +37,109 @@ const flag = (name, fallback) => {
 }
 
 const size = Number(flag('size', '256'))
-const out = resolve(flag('out', 'templates/img/deepseek-harness.png'))
+const badge = Number(flag('badge', String(Math.round(size / 4))))
+const inset = Number(flag('inset', String(Math.round(size * 0.039))))
+const radius = Number(flag('radius', String(Math.round(badge * 0.22))))
+const out = resolve(flag('out', 'templates/img/dsh.png'))
+const markSrc = resolve(flag('mark', 'templates/img/src/dsh-mark.svg'))
+const badgeSrc = resolve(flag('badge-mark', 'templates/img/src/unraid-mark.svg'))
+const flatten = flag('flatten', '')
 
-if (!Number.isInteger(size) || size < 64 || size > 1024) {
-  console.error('make-icon: --size must be an integer between 64 and 1024')
+for (const [name, value] of [['size', size], ['badge', badge], ['inset', inset], ['radius', radius]]) {
+  if (!Number.isFinite(value) || value <= 0) {
+    console.error(`make-icon: --${name} must be a positive number`)
+    process.exit(2)
+  }
+}
+if (badge * 2 + inset > size) {
+  console.error('make-icon: the badge does not fit in the canvas')
   process.exit(2)
 }
 
-const BACKGROUND_TOP = [37, 99, 235] // #2563eb
-const BACKGROUND_BOTTOM = [29, 78, 216] // #1d4ed8
-const INK = [255, 255, 255]
-const RADIUS = size * 0.22
+/** sharp is resolved from an explicit path, the local tree, or the DSH image. */
+async function loadSharp() {
+  const candidates = [
+    flag('sharp', ''),
+    process.env.SHARP_PATH ?? '',
+    'sharp',
+    '/opt/dsh/node_modules/sharp',
+  ].filter((value) => value !== '')
 
-/** Distance from a point to a line segment, used to stroke the chevron. */
-function distanceToSegment(px, py, ax, ay, bx, by) {
-  const dx = bx - ax
-  const dy = by - ay
-  const lengthSquared = dx * dx + dy * dy
-  const t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSquared))
-  const cx = ax + t * dx
-  const cy = ay + t * dy
-  return Math.hypot(px - cx, py - cy)
-}
-
-function insideRoundedSquare(x, y) {
-  const min = 0
-  const max = size - 1
-  const cx = Math.min(Math.max(x, min + RADIUS), max - RADIUS)
-  const cy = Math.min(Math.max(y, min + RADIUS), max - RADIUS)
-  return Math.hypot(x - cx, y - cy) <= RADIUS
-}
-
-const stroke = size * 0.055
-const chevron = [
-  [size * 0.36, size * 0.3, size * 0.62, size * 0.5],
-  [size * 0.62, size * 0.5, size * 0.36, size * 0.7],
-]
-const caret = [size * 0.7, size * 0.7, stroke * 0.9]
-
-const raw = Buffer.alloc(size * (size * 4 + 1))
-for (let y = 0; y < size; y += 1) {
-  const rowStart = y * (size * 4 + 1)
-  raw[rowStart] = 0 // PNG filter type 0 (None)
-  const mix = y / (size - 1)
-  for (let x = 0; x < size; x += 1) {
-    const offset = rowStart + 1 + x * 4
-    const inside = insideRoundedSquare(x, y)
-    let r = Math.round(BACKGROUND_TOP[0] * (1 - mix) + BACKGROUND_BOTTOM[0] * mix)
-    let g = Math.round(BACKGROUND_TOP[1] * (1 - mix) + BACKGROUND_BOTTOM[1] * mix)
-    let b = Math.round(BACKGROUND_TOP[2] * (1 - mix) + BACKGROUND_BOTTOM[2] * mix)
-    let a = inside ? 255 : 0
-
-    if (inside) {
-      let ink = false
-      for (const [ax, ay, bx, by] of chevron) {
-        if (distanceToSegment(x + 0.5, y + 0.5, ax, ay, bx, by) <= stroke) ink = true
-      }
-      const [cx, cy, cw] = caret
-      if (Math.abs(x + 0.5 - cx) <= cw / 2 && Math.abs(y + 0.5 - cy) <= stroke * 0.6) ink = true
-      if (ink) {
-        r = INK[0]
-        g = INK[1]
-        b = INK[2]
-      }
+  for (const candidate of candidates) {
+    try {
+      if (candidate.startsWith('/')) await access(candidate)
+      const require = createRequire(import.meta.url)
+      return require(candidate)
+    } catch {
+      // try the next candidate
     }
+  }
+  console.error(
+    'make-icon: sharp is not available.\n' +
+      '  Install it (pnpm add -D sharp) or point at an existing copy:\n' +
+      '  node scripts/make-icon.mjs --sharp=/path/to/node_modules/sharp',
+  )
+  process.exit(3)
+}
 
-    raw[offset] = r
-    raw[offset + 1] = g
-    raw[offset + 2] = b
-    raw[offset + 3] = a
+const sharp = await loadSharp()
+
+for (const [label, path] of [['mark', markSrc], ['badge mark', badgeSrc]]) {
+  try {
+    await access(path)
+  } catch {
+    console.error(`make-icon: ${label} source not found: ${path}`)
+    process.exit(4)
   }
 }
 
-const CRC_TABLE = (() => {
-  const table = new Int32Array(256)
-  for (let n = 0; n < 256; n += 1) {
-    let c = n
-    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
-    table[n] = c
-  }
-  return table
-})()
+// 1 — the main subject
+const markSize = Math.round(size * 0.94)
+const mark = await sharp(markSrc, { density: 1200 })
+  .resize(markSize, markSize, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+  .png()
+  .toBuffer()
 
-function crc32(buffer) {
-  let crc = 0xffffffff
-  for (const byte of buffer) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8)
-  return (crc ^ 0xffffffff) >>> 0
-}
+// 2 — the badge tile: rounded square, hairline border, soft shadow underneath
+const tileSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${badge}" height="${badge}">
+  <rect x="0.5" y="0.5" width="${badge - 1}" height="${badge - 1}" rx="${radius}" ry="${radius}" fill="#ffffff" stroke="#d9d9e0" stroke-width="1"/>
+</svg>`
+const shadowSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${badge}" height="${badge}">
+  <rect x="0" y="0" width="${badge}" height="${badge}" rx="${radius}" ry="${radius}" fill="#0b1220" fill-opacity="0.22"/>
+</svg>`
+const tile = await sharp(Buffer.from(tileSvg)).png().toBuffer()
+const shadow = await sharp(Buffer.from(shadowSvg))
+  .blur(Math.max(1, badge * 0.05))
+  .png()
+  .toBuffer()
 
-function chunk(type, data) {
-  const length = Buffer.alloc(4)
-  length.writeUInt32BE(data.length, 0)
-  const typeAndData = Buffer.concat([Buffer.from(type, 'ascii'), data])
-  const crc = Buffer.alloc(4)
-  crc.writeUInt32BE(crc32(typeAndData), 0)
-  return Buffer.concat([length, typeAndData, crc])
-}
+const barsSize = Math.round(badge * 0.72)
+const bars = await sharp(badgeSrc, { density: 900 })
+  .resize(barsSize, barsSize, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+  .png()
+  .toBuffer()
 
-const header = Buffer.alloc(13)
-header.writeUInt32BE(size, 0)
-header.writeUInt32BE(size, 4)
-header[8] = 8 // bit depth
-header[9] = 6 // colour type: RGBA
-header[10] = 0 // compression
-header[11] = 0 // filter
-header[12] = 0 // interlace
+const badgeLayer = await sharp(tile)
+  .composite([{ input: bars, gravity: 'center' }])
+  .png()
+  .toBuffer()
 
-const png = Buffer.concat([
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-  chunk('IHDR', header),
-  chunk('IDAT', deflateSync(raw, { level: 9 })),
-  chunk('IEND', Buffer.alloc(0)),
+const badgeLeft = size - badge - inset
+const badgeTop = size - badge - inset
+
+// 3 — compose
+await mkdir(dirname(out), { recursive: true })
+
+let canvas = sharp({
+  create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+}).composite([
+  { input: mark, gravity: 'center' },
+  { input: shadow, top: badgeTop + Math.max(1, Math.round(badge * 0.03)), left: badgeLeft + Math.max(1, Math.round(badge * 0.02)) },
+  { input: badgeLayer, top: badgeTop, left: badgeLeft },
 ])
 
-await mkdir(dirname(out), { recursive: true })
-await writeFile(out, png)
-process.stdout.write(`${out} (${png.length} bytes)\n`)
+if (flatten !== '') canvas = canvas.flatten({ background: flatten })
+
+const info = await canvas.png({ compressionLevel: 9 }).toFile(out)
+
+console.log(`${out} — ${info.width}x${info.height}, ${info.size} bytes, badge ${badge}px (1/${Math.round((size * size) / (badge * badge))} of the area)`)

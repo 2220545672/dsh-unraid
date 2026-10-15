@@ -108,7 +108,17 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/resolve-dsh-version.mjs --json
-          node scripts/make-icon.mjs --out=/tmp/deepseek-harness.png
-          node scripts/render-template.mjs --owner=example --out=/tmp/deepseek-harness.xml
-          python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('/tmp/deepseek-harness.xml'); print('rendered template is well-formed XML')"
-          file /tmp/deepseek-harness.png
+          node scripts/render-template.mjs --owner=example --out=/tmp/dsh.xml
+          python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('/tmp/dsh.xml'); print('rendered template is well-formed XML')"
+          # The composed icon is committed; scripts/make-icon.mjs needs sharp, which CI
+          # deliberately does not install, so only its PNG header is verified here.
+          node -e '
+            const fs = require("node:fs");
+            const buf = fs.readFileSync("templates/img/dsh.png");
+            const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+            if (!buf.subarray(0, 8).equals(signature)) { console.error("templates/img/dsh.png is not a PNG"); process.exit(1); }
+            const width = buf.readUInt32BE(16);
+            const height = buf.readUInt32BE(20);
+            console.log(`icon ok: ${width}x${height}, ${buf.length} bytes`);
+            if (width !== height || width < 128) process.exit(1);
+          '

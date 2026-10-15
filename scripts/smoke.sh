@@ -3,7 +3,7 @@
 # Post-build smoke test for one already-built image. Runs on the CI runner (it
 # needs a Docker daemon), not inside the container.
 #
-#   scripts/smoke.sh ghcr.io/owner/deepseek-harness:0.2.1-alpha.3
+#   scripts/smoke.sh ghcr.io/owner/dsh:0.2.1-alpha.3
 #
 # Environment:
 #   SMOKE_PORT           host port to publish (default 18080)

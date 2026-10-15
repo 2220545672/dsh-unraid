@@ -23,7 +23,7 @@ WORKDIR /app
 
 RUN set -eux; \
     test -n "${DSH_VERSION}"; \
-    printf '{\n  "name": "deepseek-harness-runtime",\n  "private": true,\n  "dependencies": { "@deepseek-ai/dsh": "%s" }\n}\n' "${DSH_VERSION}" > package.json; \
+    printf '{\n  "name": "dsh-runtime",\n  "private": true,\n  "dependencies": { "@deepseek-ai/dsh": "%s" }\n}\n' "${DSH_VERSION}" > package.json; \
     npm install --omit=dev --no-audit --no-fund --loglevel=warn; \
     node -e 'const want = process.env.DSH_VERSION; const got = require("/app/node_modules/@deepseek-ai/dsh/package.json").version; if (got !== want) { console.error(`resolved ${got}, expected ${want}`); process.exit(1); }'; \
     test -f /app/node_modules/@deepseek-ai/dsh/lib/bin.js; \
@@ -59,7 +59,7 @@ FROM node:${NODE_VERSION}-bookworm-slim AS runtime
 ARG DSH_VERSION
 ARG CADDY_VERSION
 ARG DSH_REVISION=1
-ARG SOURCE_REPO=deepseek-harness-unraid
+ARG SOURCE_REPO=dsh-unraid
 
 LABEL org.opencontainers.image.title="DeepSeek Harness" \
       org.opencontainers.image.description="DeepSeek Harness web UI with a working bubblewrap sandbox on Landlock-less hosts (Unraid)" \
@@ -100,7 +100,7 @@ RUN set -eux; \
     chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh /usr/local/bin/caddy; \
     printf '#!/bin/sh\nexec node /app/node_modules/@deepseek-ai/dsh/lib/bin.js "$@"\n' > /usr/local/bin/dsh; \
     chmod 0755 /usr/local/bin/dsh; \
-    printf 'DSH_VERSION=%s\nCADDY_VERSION=%s\n' "${DSH_VERSION}" "${CADDY_VERSION}" > /etc/deepseek-harness-version; \
+    printf 'DSH_VERSION=%s\nCADDY_VERSION=%s\n' "${DSH_VERSION}" "${CADDY_VERSION}" > /etc/dsh-version; \
     mkdir -p /data/dsh/agents /workspace; \
     chown -R 1000:1000 /data /workspace
 

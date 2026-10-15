@@ -43,7 +43,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/deepseek-harness
+  IMAGE_NAME: ${{ github.repository_owner }}/dsh
   DEFAULT_NODE_VERSION: '24.21.0'
   CADDY_VERSION: '2.11.7'
 
@@ -173,7 +173,7 @@ jobs:
             echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve.outputs.channel }}\` (channel)"
             echo "- digest: \`${{ steps.push.outputs.digest }}\`"
             echo ''
-            echo 'If this is the first publish, make the package public: GitHub → your profile → Packages → deepseek-harness → Package settings → Change visibility.'
+            echo 'If this is the first publish, make the package public: GitHub → your profile → Packages → dsh → Package settings → Change visibility.'
           } >> "${GITHUB_STEP_SUMMARY}"
 
   release:
@@ -191,11 +191,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          node scripts/make-icon.mjs --out=templates/img/deepseek-harness.png
+          # The icon is committed (scripts/make-icon.mjs needs sharp, which this job does not install).
           node scripts/render-template.mjs \
             --tag='${{ needs.resolve.outputs.version }}' \
             --version='${{ needs.resolve.outputs.version }}' \
-            --out='dist/deepseek-harness.xml'
+            --out='dist/dsh.xml'
 
       - name: Create the GitHub release
         env:
@@ -213,7 +213,7 @@ jobs:
           - image digest: \`${{ needs.publish.outputs.digest }}\`
 
           ### Install on Unraid
-          1. \`Docker → Add Container\`, paste the template URL of \`deepseek-harness.xml\` from this release, or import the file directly.
+          1. \`Docker → Add Container\`, paste the template URL of \`dsh.xml\` from this release, or import the file directly.
           2. Keep \`Extra Parameters\` as shipped:
              \`--security-opt seccomp=unconfined --security-opt systempaths=unconfined\`.
              Unraid kernels ship without Landlock, so the bundled bubblewrap is the
@@ -228,5 +228,5 @@ jobs:
           gh release create "${tag}" \
             --title "DeepSeek Harness ${version}" \
             --notes-file dist/notes.md \
-            dist/deepseek-harness.xml \
-            templates/img/deepseek-harness.png
+            dist/dsh.xml \
+            templates/img/dsh.png

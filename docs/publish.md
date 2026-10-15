@@ -6,14 +6,14 @@
 
 在 GitHub 上新建 **公开** 仓库（CA 与图标 URL 都要求公开可读）：
 
-- 名称：`deepseek-harness-unraid`
+- 名称：`dsh-unraid`
 - 不要勾选 "Add a README"（本地已有历史）
 
 ## 2. 推送
 
 ```bash
-cd /workspace/unraid/deepseek-harness-unraid
-git remote add origin git@github.com:<你的用户名>/deepseek-harness-unraid.git   # 或 https://github.com/<你的用户名>/deepseek-harness-unraid.git
+cd /workspace/unraid/dsh-unraid
+git remote add origin git@github.com:<你的用户名>/dsh-unraid.git   # 或 https://github.com/<你的用户名>/dsh-unraid.git
 git push -u origin main
 ```
 
@@ -24,7 +24,7 @@ git push -u origin main
 | 设置 | 位置 | 为什么 |
 |---|---|---|
 | **Workflow permissions = Read and write** | Settings → Actions → General → Workflow permissions | 新建仓库默认是只读。只读时 workflow 里写 `packages: write` 也**不会**被授予，推送 GHCR 会 403。 |
-| **把 GHCR 包设为 public** | 首次发布成功后：个人头像 → Packages → `deepseek-harness` → Package settings → Change visibility | GHCR 包默认是私有的，Unraid 上匿名 `docker pull` 会 401。 |
+| **把 GHCR 包设为 public** | 首次发布成功后：个人头像 → Packages → `dsh` → Package settings → Change visibility | GHCR 包默认是私有的，Unraid 上匿名 `docker pull` 会 401。 |
 
 另外记一条 GitHub 行为：**公开仓库连续 60 天无活动，定时工作流会被自动停用**。本仓库的 cron 每 6 小时跑一次上游检查，只要上游一直在发版就不会触发；如果 DSH 长期停更，去 Actions 页面点一次 "Enable workflow"。
 
@@ -41,16 +41,16 @@ Actions → **release** → *Run workflow*：
 
 ## 5. 让模板指向你的命名空间
 
-仓库里的 `templates/deepseek-harness.xml` 用的是占位符（`__GHCR_OWNER__`、`__REPO__`、`__IMAGE_TAG__`），一是避免硬编码，二是方便 fork。**提交 CA 之前**要渲染一次并提交：
+仓库里的 `templates/dsh.xml` 用的是占位符（`__GHCR_OWNER__`、`__REPO__`、`__IMAGE_TAG__`），一是避免硬编码，二是方便 fork。**提交 CA 之前**要渲染一次并提交：
 
 ```bash
-cd /workspace/unraid/deepseek-harness-unraid
-node scripts/render-template.mjs --owner=<你的GitHub用户名> --repo=deepseek-harness-unraid --tag=latest \
-  --out=templates/deepseek-harness.xml
-git add templates/deepseek-harness.xml && git commit -m "chore: render template for <owner>" && git push
+cd /workspace/unraid/dsh-unraid
+node scripts/render-template.mjs --owner=<你的GitHub用户名> --repo=dsh-unraid --tag=latest \
+  --out=templates/dsh.xml
+git add templates/dsh.xml && git commit -m "chore: render template for <owner>" && git push
 ```
 
-（`scripts/make-icon.mjs` 生成的图标已经在仓库里；想换风格就重跑它。）
+（`templates/img/dsh.png` 已提交在仓库里；要换风格就先 `pnpm add -D sharp`，再跑 `node scripts/make-icon.mjs`，素材与出处见 `templates/img/src/README.md`。）
 
 ## 6. 然后才是 CA
 

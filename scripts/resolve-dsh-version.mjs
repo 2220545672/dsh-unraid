@@ -91,7 +91,7 @@ function compareSemver(a, b) {
 
 async function fetchJson(url) {
   const response = await fetch(url, {
-    headers: { accept: 'application/json', 'user-agent': 'deepseek-harness-unraid-release' },
+    headers: { accept: 'application/json', 'user-agent': 'dsh-unraid-release' },
     signal: AbortSignal.timeout(30_000),
   })
   if (!response.ok) throw new Error(`${url} responded ${response.status}`)

@@ -67,12 +67,12 @@ ssh unraid 'grep -c CONFIG_SECURITY_LANDLOCK /boot/config/$(uname -r) 2>/dev/nul
   grep -i landlock /proc/kallsyms | head -3'
 
 # 2. 镜像里有没有 bwrap
-ssh unraid 'docker run --rm --entrypoint bwrap ghcr.io/<owner>/deepseek-harness:latest --version'
+ssh unraid 'docker run --rm --entrypoint bwrap ghcr.io/<owner>/dsh:latest --version'
 
 # 3. 带两个 security-opt 时能不能真的建命名空间（应输出 SANDBOX_OK）
 ssh unraid 'docker run --rm \
   --security-opt seccomp=unconfined --security-opt systempaths=unconfined \
-  --entrypoint setpriv ghcr.io/<owner>/deepseek-harness:latest \
+  --entrypoint setpriv ghcr.io/<owner>/dsh:latest \
   --reuid 1000 --regid 1000 --init-groups \
   bwrap --ro-bind / / --dev /dev --unshare-pid --proc /proc --die-with-parent \
     --tmpfs /tmp --bind /workspace /workspace -- /bin/sh -c "echo SANDBOX_OK"'

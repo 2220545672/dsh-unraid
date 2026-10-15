@@ -7,9 +7,9 @@
 # can create its namespaces. See docs/unraid-sandbox.md for the full reasoning
 # and the trade-off. On a Landlock-capable kernel you may drop them.
 services:
-  deepseek-harness:
-    image: ${DSH_IMAGE:-ghcr.io/OWNER/deepseek-harness:latest}
-    container_name: deepseek-harness
+  dsh:
+    image: ${DSH_IMAGE:-ghcr.io/OWNER/dsh:latest}
+    container_name: dsh
     restart: unless-stopped
     ports:
       - "${DSH_PORT:-8080}:8080"
