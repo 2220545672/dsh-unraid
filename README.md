@@ -111,6 +111,18 @@ The container serves its own password gate and it is **on by default**, because 
 * **A password over plain HTTP is not safe on the internet.** The gate protects the application, not the wire: if you expose this beyond your LAN, terminate TLS in a reverse proxy in front. Set `PUBLIC_URL` for that so the container only answers for that authority.
 * **Already have SSO?** Set `AUTH_MODE=none` and let the proxy authenticate (SWAG + Authelia, Authentik, ...). `ALLOWED_CLIENTS` stays in force as a second layer. Any other `AUTH_MODE` value fails closed.
 
+### Choosing a shape
+
+Three shapes cover almost everybody. They are mutually exclusive on purpose: **never stack two logins** — if a proxy already authenticates the browser, do not also put the container's gate in front of it (the user would be asked twice).
+
+| Shape | Settings | Pick it when |
+|---|---|---|
+| **Single box with the built-in gate** (default) | `AUTH_MODE=builtin`, password in `DSH_PASSWORD` (empty = generated and printed once), `ALLOWED_CLIENTS` as shipped | You have no reverse proxy or SSO, and want remote access to work after one install. Put it behind a TLS proxy before exposing it to the internet. |
+| **Reverse proxy with SSO** | `AUTH_MODE=none`, `PUBLIC_URL=https://dsh.example.com`, `TRUSTED_PROXY_CIDRS=<your proxy's network>` | You already run SWAG/NPM/Authelia/Authentik (or any authenticating front end) and want 2FA, audit logs and central revocation. `ALLOWED_CLIENTS` stays in force as a second layer. |
+| **LAN or tunnel only** | `AUTH_MODE=none` (or `builtin`), `ALLOWED_CLIENTS` narrowed to your own subnets | The port is only reachable from home or through Tailscale / an SSH tunnel, and you accept that anyone who gets there acts as you. |
+
+An unknown `AUTH_MODE` never boots: the container refuses to start and says which values it accepts, so a configuration copied from another image fails closed instead of silently losing a login.
+
 ## Updating and version tags
 
 The image follows upstream automatically: a new release is built, smoke-tested and published, tagged as `dsh-<version>`, and announced as a GitHub release (with a version-pinned template for reproducible installs).

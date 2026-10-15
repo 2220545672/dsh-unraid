@@ -111,6 +111,18 @@ docker run -d --name dsh --restart unless-stopped \
 * **口令走明文 HTTP 在公网并不安全**：门禁保护的是应用，不是链路。要暴露到局域网之外，必须在前面用反向代理终结 TLS；配合设置 `PUBLIC_URL`，容器就只应答那一个 authority。
 * **已经有 SSO？** 把 `AUTH_MODE` 设为 `none`，交给代理认证（SWAG + Authelia、Authentik……），`ALLOWED_CLIENTS` 仍作为第二层生效。其它 `AUTH_MODE` 取值一律 fail-closed。
 
+### 三种部署形态怎么选
+
+下面三种覆盖了几乎所有情况。它们**刻意互斥**：**绝不要叠加两次登录**——前面已经有认证代理时，就不要再开容器自带门禁，否则浏览器会被问两遍。
+
+| 形态 | 配置 | 什么时候选它 |
+|---|---|---|
+| **单体 + 内置门禁（默认）** | `AUTH_MODE=builtin`，口令填 `DSH_PASSWORD`（留空则首启生成并打印一次），`ALLOWED_CLIENTS` 保持默认 | 你没有反向代理 / SSO，希望"装完就能远程用"。要暴露到公网前，仍需在前面加一层终结 TLS 的反代。 |
+| **反代 + SSO** | `AUTH_MODE=none`、`PUBLIC_URL=https://dsh.example.com`、`TRUSTED_PROXY_CIDRS=<代理所在网段>` | 你已经有 SWAG / NPM / Authelia / Authentik 之类，并且要 2FA、审计日志、集中吊销。`ALLOWED_CLIENTS` 仍然作为第二层生效。 |
+| **只在内网或隧道里用** | `AUTH_MODE=none`（或 `builtin`），`ALLOWED_CLIENTS` 收紧到你自己的网段 | 端口只在家里或经 Tailscale / SSH 隧道可达，并且你接受"能连上的人就等于你自己"。 |
+
+`AUTH_MODE` 填了未知值时容器**不会启动**，会明确告诉你它接受哪些值——所以从别的镜像抄来的配置会 fail-closed，而不是悄悄少掉一道登录。
+
 ## 更新与版本
 
 镜像自动跟随上游：新版本会经过构建、冒烟测试后发布，打上 `dsh-<版本>` 标签，并生成 GitHub Release（附版本锁定模板，供需要可复现部署的人使用）。

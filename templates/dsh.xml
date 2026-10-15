@@ -34,7 +34,7 @@
 **三步开始**
 1. 安装并打开 http://&lt;你的服务器IP&gt;:8080 ：浏览器先弹出登录框，用户名 dsh，口令为模板里填的「访问口令」（留空则去 Docker 页 → 该容器 → Logs 找 GENERATED PASSWORD）。登录后会自动完成令牌引导。
 2. 状态与项目分别放在 /data 与 /workspace（默认映射到 appdata/dsh/...），升级容器不会丢会话。
-3. 放在反向代理之后时，把 PUBLIC_URL 设为对外地址（例如 https://dsh.example.com），容器就只接受该来源的请求；纯内网可留空。
+3. 放在反向代理之后时，把 PUBLIC_URL 设为对外地址（例如 https://dsh.example.com），容器就只接受该来源的请求；纯内网可留空。**若该代理本身已经做了认证（如 SWAG + Authelia），请把「认证方式」改成 none**，否则会连着弹两次登录框。
 
 模型凭据在应用界面里配置，本模板不要求填写任何密钥。
 
@@ -55,7 +55,7 @@ DSH (DeepSeek Harness) is an open-source coding agent whose interface is a brows
 **Get started in three steps**
 1. Install, then open http://&lt;your-server&gt;:8080 — the browser asks for a login first (user dsh, password from 访问口令 / DSH_PASSWORD, or the GENERATED PASSWORD printed once in the container log); the token bootstrap then completes automatically.
 2. State and projects live in /data and /workspace (mapped to appdata/dsh/... by default), so upgrading the container keeps your sessions.
-3. Behind a reverse proxy, set PUBLIC_URL to the public origin (for example https://dsh.example.com) so the container only answers for that authority; leave it empty on a trusted LAN. If that proxy already authenticates (SWAG + Authelia, Authentik, ...), also set 认证方式 / AUTH_MODE to none so the browser is not asked twice.
+3. Behind a reverse proxy, set PUBLIC_URL to the public origin (for example https://dsh.example.com) so the container only answers for that authority; leave it empty on a trusted LAN. If that proxy already authenticates (SWAG + Authelia, ...), also set 认证方式 / AUTH_MODE to none, or the browser is asked to log in twice. If that proxy already authenticates (SWAG + Authelia, Authentik, ...), also set 认证方式 / AUTH_MODE to none so the browser is not asked twice.
 
 Model credentials are configured inside the app; this template never asks for a key.
 
