@@ -90,6 +90,8 @@ LABEL org.opencontainers.image.title="DeepSeek Harness" \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# /home/node/workspace -> /workspace: DSH's directory picker starts at $HOME and
+# lists symlinks, so this puts the projects one click from the picker's default view.
 # bubblewrap  : second sandbox rung for kernels without Landlock (Unraid)
 # tini        : PID 1 that reaps the DSH + Caddy pair
 # git/curl/jq/ripgrep/less/procps : what an agent inside the container needs
@@ -129,7 +131,9 @@ RUN set -eux; \
     rm -rf /root/.npm; \
     printf 'DSH_VERSION=%s\nCADDY_VERSION=%s\n' "${DSH_VERSION}" "${CADDY_VERSION}" > /etc/dsh-version; \
     mkdir -p /data/dsh/agents /workspace; \
-    chown -R 1000:1000 /data /workspace
+    chown -R 1000:1000 /data /workspace; \
+    ln -sfn /workspace /home/node/workspace; \
+    chown -h 1000:1000 /home/node/workspace
 
 # HOME must point at the account the container drops to: the base image leaves it
 # at /root, which uid 1000 cannot write, so `~/.ssh/config`, git config and tool
