@@ -225,8 +225,14 @@ jobs:
 
           Documentation: https://github.com/${{ github.repository }}/blob/main/README.md
           EOF
-          gh release create "${tag}" \
-            --title "DeepSeek Harness ${version}" \
-            --notes-file dist/notes.md \
-            dist/dsh.xml \
-            templates/img/dsh.png
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            # A forced rebuild of an already released version must not fail here.
+            gh release upload "${tag}" dist/dsh.xml templates/img/dsh.png --clobber
+            gh release edit "${tag}" --title "DSH ${version}" --notes-file dist/notes.md
+          else
+            gh release create "${tag}" \
+              --title "DSH ${version}" \
+              --notes-file dist/notes.md \
+              dist/dsh.xml \
+              templates/img/dsh.png
+          fi

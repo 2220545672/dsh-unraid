@@ -217,7 +217,7 @@ resolve_launch_token() {
     local line
     for _ in $(seq 1 60); do
         while IFS= read -r line; do
-            if [[ "${line}" =~ ^dsh\ web:\ http://127\.0\.0\.1:${DSH_INTERNAL_PORT}/\?token=([A-Za-z0-9_-]{20,256})$ ]]; then
+            if [[ "${line}" =~ ^dsh\ web:.*token=([A-Za-z0-9_.-]{16,512}) ]]; then
                 DSH_LAUNCH_TOKEN="${BASH_REMATCH[1]}"
                 return 0
             fi
@@ -231,6 +231,8 @@ resolve_launch_token() {
         kill -0 "${DSH_PID}" 2>/dev/null || fatal "DeepSeek Harness exited without publishing a launch token"
         sleep 1
     done
+    printf '[entrypoint] no launch token found; last lines of the DSH startup log:\n' >&2
+    tail -n 40 "${DSH_STARTUP_LOG}" >&2 || true
     fatal "DeepSeek Harness did not publish a launch token within 60 seconds"
 }
 
