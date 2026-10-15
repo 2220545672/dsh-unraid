@@ -146,4 +146,6 @@ An Unraid-first DeepSeek Harness image: multi-arch, rebuilt automatically from t
 
 ## License
 
-MIT（见 [LICENSE](LICENSE)）。DeepSeek Harness 本身由 DeepSeek 以 MIT 许可发布，本仓库只做打包。
+MIT（见 [LICENSE](LICENSE)）。DeepSeek Harness 本身由 DeepSeek 以 MIT 许可发布，本仓库只做打包；仓库里的图标是原创合成作品，素材出处见 [templates/img/src/README.md](templates/img/src/README.md)。
+
+> `LICENSE` 保持逐字 MIT 正文不带附加段落，这样 GitHub 与各类扫描器才能识别为 **MIT**（曾因追加说明被识别成 "Other"，会挡住 Community Applications 的许可证要求）。
