@@ -38,7 +38,8 @@
 
 模型凭据在应用界面里配置，本模板不要求填写任何密钥。
 
-**页面提示 “dsh web authentication required”**：打开一次 `http://<你的地址>:<端口>/renew`（会重放启动 token，DSH 重新签发会话 cookie）；清掉该站点的 Cookie 也一样有效。<br>**排障**
+**页面提示 “dsh web authentication required”**：打开一次 `http://&lt;你的地址&gt;:&lt;端口&gt;/renew`（会重放启动 token，DSH 重新签发会话 cookie）；清掉该站点的 Cookie 也一样有效。
+**排障**
 - docker logs &lt;容器名&gt; | head -30 ：启动日志会写明运行模式（edge / lan）、上游版本与启动结果。
 - 命令工具报 SANDBOX_UNAVAILABLE ：说明模板自带的 Extra Parameters 被删掉了，恢复那两个 --security-opt 即可。
 
@@ -59,6 +60,7 @@ DSH (DeepSeek Harness) is an open-source coding agent whose interface is a brows
 
 Model credentials are configured inside the app; this template never asks for a key.
 
+**Page says “dsh web authentication required”**: open `http://&lt;your-address&gt;:&lt;port&gt;/renew` once (it replays the launch token and DSH issues a fresh session cookie); clearing that site's cookies works too.
 **Troubleshooting**
 - docker logs &lt;container&gt; | head -30 — the entrypoint prints the mode (edge / lan), the upstream version and the startup result.
 - Tools reporting SANDBOX_UNAVAILABLE mean the template's Extra Parameters were removed; restore the two --security-opt values.

@@ -78,6 +78,52 @@ const tag = (name) => {
   const match = new RegExp(`<${name}>([\\s\\S]*?)</${name}>`).exec(xml)
   return match === null ? '' : match[1].trim()
 }
+/**
+ * Tag-stack check for XML well-formedness. The CI gate runs the same test through
+ * python3, but python3 is not installed in our own container, so a stray "<" in a
+ * ReadMe text node (e.g. "http://<host>:<port>/renew") passed locally and failed
+ * only in CI. This keeps the failure local, where it is cheap.
+ * @param {string} source
+ * @returns {string[]} problems, empty when the document is balanced
+ */
+function wellFormed(source) {
+  const problems = []
+  const stack = []
+  let i = 0
+  while (i < source.length) {
+    const lt = source.indexOf('<', i)
+    if (lt === -1) break
+    if (source.startsWith('<!--', lt)) {
+      const end = source.indexOf('-->', lt)
+      if (end === -1) { problems.push('unterminated comment'); break }
+      i = end + 3
+      continue
+    }
+    if (source.startsWith('<?', lt)) {
+      const end = source.indexOf('?>', lt)
+      if (end === -1) { problems.push('unterminated processing instruction'); break }
+      i = end + 2
+      continue
+    }
+    const gt = source.indexOf('>', lt)
+    if (gt === -1) { problems.push(`unterminated tag at offset ${lt}`); break }
+    const tag = source.slice(lt + 1, gt)
+    i = gt + 1
+    if (tag.startsWith('!')) continue
+    const closing = tag.startsWith('/')
+    const selfClosing = tag.endsWith('/')
+    const name = (closing ? tag.slice(1) : tag).split(/[\s/]/)[0]
+    if (closing) {
+      const open = stack.pop()
+      if (open !== name) problems.push(`</${name}> closes <${open ?? 'nothing'}> (line ${source.slice(0, lt).split('\n').length})`)
+      continue
+    }
+    if (!selfClosing) stack.push(name)
+  }
+  for (const open of stack) problems.push(`<${open}> is never closed`)
+  return problems
+}
+
 const configs = [...xml.matchAll(/<Config\s([^>]*)>([\s\S]*?)<\/Config>/g)].map((match) => {
   const attrs = Object.fromEntries([...match[1].matchAll(/(\w+)="([^"]*)"/g)].map((a) => [a[1], a[2]]))
   return { ...attrs, value: match[2].trim() }
@@ -112,6 +158,8 @@ const environmentNames = [...xml.matchAll(/<Variable>[\s\S]*?<Name>([^<]+)<\/Nam
 
 // 1 — unrendered placeholders make the file useless to CA
 const placeholders = [...new Set([...xml.matchAll(/__[A-Z0-9_]+__/g)].map((m) => m[0]))]
+for (const problem of wellFormed(xml)) errors.push(`${file.replace(/^.*\//, '')}: ${problem}`)
+
 if (placeholders.length > 0) errors.push(`unrendered placeholders: ${placeholders.join(', ')}`)
 
 // 2 — identity
