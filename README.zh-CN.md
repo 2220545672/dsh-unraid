@@ -15,6 +15,8 @@
 
 ---
 
+> **开发者预览。** DeepSeek Harness 处于 _开发者预览_ 阶段，正在快速迭代。**未来将出现破坏兼容性的变更。** —— 引自[上游项目](https://github.com/deepseek-ai/deepseek-harness/blob/main/README.zh.md#开发者预览)。本镜像会自动跟随上游发布；想自己掌握节奏，可以钉住[版本标签](#更新)。
+
 ## 安装
 
 **Unraid 上（推荐）**
@@ -110,7 +112,7 @@ Unraid：**Docker → 你的容器 → force update**（或点「apply update」
 | [CONTRIBUTING.md](CONTRIBUTING.zh-CN.md) | 构建、测试、发布与模板流程 |
 | [docs/ca-submission.md](docs/ca-submission.zh-CN.md) | Community Applications 提交说明 |
 
-**已知限制。** 单用户设计：没有账户体系，能打开界面的人就是同一个工作区主人。用 DeepSeek **账号**登录需要回环地址（请用 API Key）。上游仍是预发布阶段。镜像约 0.9 GB。
+**已知限制。** 单用户设计：没有账户体系，能打开界面的人就是同一个工作区主人。用 DeepSeek **账号**登录需要回环地址（请用 API Key）。上游处于开发者预览阶段，破坏兼容性的变更属于预期之内——见开头的提示。镜像约 0.9 GB。
 
 ## 支持
 

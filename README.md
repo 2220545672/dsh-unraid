@@ -15,6 +15,8 @@
 
 ---
 
+> **Developer preview.** DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.** — quoted from the [upstream project](https://github.com/deepseek-ai/deepseek-harness#developer-preview). This image tracks upstream releases automatically, so pin a [version tag](#update) if you would rather move on your own schedule.
+
 ## Install
 
 **On Unraid (recommended)**
@@ -110,7 +112,7 @@ Volumes are taken over as `1000:1000`. Leave that alone — it is not Unraid's u
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing, releasing, template workflow |
 | [docs/ca-submission.md](docs/ca-submission.md) | Community Applications submission notes |
 
-**Known limits.** Single-user by design: there is no account database, so everyone who reaches the UI acts as the same owner. DeepSeek **account** sign-in needs a loopback browser (use an API key). Upstream is prerelease. About 0.9 GB on disk.
+**Known limits.** Single-user by design: there is no account database, so everyone who reaches the UI acts as the same owner. DeepSeek **account** sign-in needs a loopback browser (use an API key). Upstream is in developer preview, so breaking changes are expected — see the notice at the top. About 0.9 GB on disk.
 
 ## Support
 
