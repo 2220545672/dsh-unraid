@@ -64,7 +64,7 @@ Unraid：**Docker → 你的容器 → force update**（或点「apply update」
 | 浏览器拿到 `403` | 你的地址不在 `ALLOWED_CLIENTS` 里；裸 `docker run` 默认只放行回环。 |
 | 用 DeepSeek 账号登录报「登录失败 / 操作未完成」 | 上游只接受**回环**来源。改用 API Key，或先开隧道登录一次：`ssh -L 3081:127.0.0.1:3081 root@<服务器>` 后打开 `http://127.0.0.1:3081`。 |
 | 更新了却没变化 | Unraid 只在镜像 digest 变化时重建容器——用 **force update**。 |
-| 页面一直转圈 | `PUBLIC_URL` 必须与你实际打开的地址一致（协议 + 主机，不带路径）。`docker logs <容器名> \| head -30` 会打印它选定的模式。 |
+| 页面一直转圈 | `PUBLIC_URL` 必须与你实际打开的地址一致（协议 + 主机，不带路径）。`docker logs` 会打印它选定的模式。 |
 
 ## 可能会用到的设置
 
