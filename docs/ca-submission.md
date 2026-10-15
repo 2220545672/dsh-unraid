@@ -42,7 +42,8 @@ CA 与模板指南都要求：**你自己维护的容器必须有 Unraid 论坛�
 
 - 这个应用是什么、镜像在哪、如何升级（本仓库是自动跟版，用户只需 force update）；
 - **为什么需要那两个 `--security-opt`**（Unraid 内核无 Landlock → bubblewrap 是唯一可用的沙箱层级；见 [unraid-sandbox.md](unraid-sandbox.md)）——这是审核者与用户最可能追问的一点；
-- 已知限制（无内建认证，必须在反代或受信内网里解决；上游仍是预发布，`:latest` 跟随最新版）；
+- 已知限制（上游仍是预发布，`:latest` 跟随最新版；内置口令门禁没有 2FA/审计，需要这些就把 `AUTH_MODE` 设为 `none` 交给 SSO）；
+- **默认安全**：不配任何东西时装出来也是带口令的（`AUTH_MODE=builtin` + 首启生成口令打印一次），不会出现"装完就是一台无认证的可执行命令 Web UI"；CA 审核问起时这就是答案。
 - 排障入口（`/healthz`、容器日志里 entrypoint 的前几行会写明模式与启动结果）。
 
 开好之后，把两处 URL 填上：

@@ -36,6 +36,8 @@
 		respond "ok" 200
 	}
 
+	# PASSWORD_GATE — replaced by the entrypoint when AUTH_MODE=builtin
+
 	# The outer proxy authenticated this browser; tell the UI so it renders the
 	# settings surfaces instead of trying to authenticate natively.
 	route /dsh-deployment.js {

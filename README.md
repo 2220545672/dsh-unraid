@@ -88,7 +88,8 @@ Then open `http://<your-server>:8080`. **You do not need to copy a token URL out
 | `PUBLIC_URL` | empty | Public origin, e.g. `https://dsh.example.com` (scheme + host only, no path). Setting it enables **edge mode**; leaving it empty is **lan mode**. |
 | `DSH_TRUSTED_HOSTS` | empty | Extra accepted authorities, comma separated (e.g. `dsh.example.com,192.168.1.10:8080`). Edge mode only. |
 | `TZ` | `Asia/Shanghai` | Container time zone. |
-| `AUTH_MODE` | `none` | The only accepted value, and it is a deliberate interlock rather than a leftover. Other packaging of this app authenticates inside the container, and their `AUTH_MODE` **defaults to `caddy-security`**; this image deliberately ships no authentication of its own. So if a migrated configuration arrives carrying `caddy-security`, `dsh` or anything else, the container **refuses to start with an explanation** instead of booting wide open while its owner believes a login is in place — failing closed rather than failing open. Set it to `none` and authenticate in front (reverse proxy + SSO, VPN, or a trusted LAN). |
+| `AUTH_MODE` | `builtin` | **Who guards the UI.** `builtin` serves the container's own password gate (default); `none` delegates authentication to an authenticating proxy or a trusted network. Any other value — including the `caddy-security` that other packaging defaults to — **fails closed** with an explanation, rather than booting wide open while its owner believes a login is in place. |
+| `DSH_PASSWORD` | empty | Password for the built-in gate (`DSH_PASSWORD_FILE` works too). Empty means the container generates one on first start and prints it **once** in the log. At least 8 characters, no whitespace. Changing it invalidates every issued login cookie. |
 
 **Volume ownership:** the entrypoint takes ownership as `1000:1000` (the `node` account inside the image). Do **not** change it to `99:100`.
 
@@ -100,6 +101,15 @@ Then open `http://<your-server>:8080`. **You do not need to copy a token URL out
 | **lan** | Only reached from a network you trust | leave `PUBLIC_URL` empty |
 
 Never publish lan mode to the internet. The container validates the host and origin of every request and adds security headers either way; the details are in [docs/security.md](docs/security.md).
+
+## Authentication
+
+The container serves its own password gate and it is **on by default**, because a default install must not be usable by everybody who can reach the port: this app runs commands in the mounted workspace and keeps your model credentials in `/data`.
+
+* **Set the password** through `DSH_PASSWORD` (or `DSH_PASSWORD_FILE`). Leave it empty and the container generates one on first start and prints it **once** in the log — `docker logs <container>`, or the Docker tab → the container → Logs. User name: `dsh`.
+* **How it works.** The password is asked for once through the browser's ordinary login prompt (HTTP basic auth). That successful check mints a cookie whose value is an HMAC of the password and a per-install salt; the cookie then carries the session for ordinary requests **and for the client's WebSocket** — browsers do not reliably attach cached HTTP credentials to a WebSocket upgrade, which is why the gate is not "basic auth on every request". `/healthz` stays open so the container healthcheck keeps working. Changing the password (or deleting `/data/caddy/data/auth-gate-salt`) invalidates every issued cookie.
+* **A password over plain HTTP is not safe on the internet.** The gate protects the application, not the wire: if you expose this beyond your LAN, terminate TLS in a reverse proxy in front. Set `PUBLIC_URL` for that so the container only answers for that authority.
+* **Already have SSO?** Set `AUTH_MODE=none` and let the proxy authenticate (SWAG + Authelia, Authentik, ...). `ALLOWED_CLIENTS` stays in force as a second layer. Any other `AUTH_MODE` value fails closed.
 
 ## Updating and version tags
 
@@ -115,7 +125,7 @@ To update on Unraid: **Docker → your container → force update** (or wait for
 
 ## Known limitations
 
-**Single-user only.** There is no user database and no second account: whoever reaches the UI acts as the same workspace owner. Authenticate in front of it (reverse proxy, SSO, VPN) or keep it on a trusted network.
+**Single-user only.** There is no user database and no second account: whoever reaches the UI acts as the same workspace owner. The container serves one password for that owner by default (see [Authentication](#authentication)); to get real multi-user separation, authenticate in front (reverse proxy, SSO, VPN) and keep it on a trusted network.
 
 **DeepSeek account sign-in needs a loopback browser.** The account flow hands `window.location.origin` to the server, and both the client and the **platform** accept only `http://localhost|127.0.0.1|[::1]:<port>` as the callback. Measured against `https://platform.deepseek.com/auth-api/v0/dsh/auth_init`: the loopback URL returns `code:0`, while LAN, Tailscale and reverse-proxy origins return `50005 PAYLOAD_SCHEMA_MISMATCH`.
 

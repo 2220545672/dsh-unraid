@@ -88,7 +88,8 @@ docker run -d --name dsh --restart unless-stopped \
 | `PUBLIC_URL` | 空 | 对外 origin，例如 `https://dsh.example.com`（只填协议 + 主机名，不要带路径）。设置后进入 **edge 模式**；留空为 **lan 模式**。 |
 | `DSH_TRUSTED_HOSTS` | 空 | 额外可信的 authority，逗号分隔（如 `dsh.example.com,192.168.1.10:8080`）。仅 edge 模式生效。 |
 | `TZ` | `Asia/Shanghai` | 容器时区。 |
-| `AUTH_MODE` | `none` | 唯一接受的值，而且这是个**有意的防呆闸门**，不是历史遗留。同类镜像是在容器内做认证的，它们的 `AUTH_MODE` **默认就是 `caddy-security`**；本镜像有意不提供任何自带认证。所以当你把旧配置（带着 `caddy-security`/`dsh`/别的值）迁过来时，容器会**拒绝启动并说明原因**，而不是"照常起来但完全没有认证"——**fail closed，而不是 fail open**。把它设成 `none`，认证放在前面（反代 + SSO、VPN，或受信内网）。 |
+| `AUTH_MODE` | `builtin` | **谁来看守界面**。`builtin` = 容器自带口令门禁（默认）；`none` = 把鉴权交给反向代理或受信内网。其它取值（包括同类镜像默认的 `caddy-security`）会让容器**拒绝启动并说明原因**，而不是"照常跑起来但完全没有认证"。 |
+| `DSH_PASSWORD` | 空 | 内置口令门禁使用的口令（也可用 `DSH_PASSWORD_FILE`）。留空则容器首次启动时随机生成一个，并在日志里**打印一次**。至少 8 位、不能含空白字符；改口令会让已签发的登录 Cookie 全部失效。 |
 
 **卷属主**：启动脚本会把两个卷改成 `1000:1000`（镜像内的 `node` 账户）。**不要**改成 `99:100`。
 
@@ -100,6 +101,15 @@ docker run -d --name dsh --restart unless-stopped \
 | **lan** | 只在你能信任的网络里访问 | `PUBLIC_URL` 留空 |
 
 **不要**把 lan 模式暴露到公网。两种模式下容器都会校验每个请求的 Host 与 Origin 并注入安全响应头；细节见 [docs/security.md](docs/security.md)。
+
+## 认证
+
+容器自带口令门禁，且**默认开启**——因为默认安装不应该让"能连到这个端口的人"都能用：这个应用会在挂载的工作目录里执行命令，并把你的模型凭据放在 `/data`。
+
+* **设置口令**：填 `DSH_PASSWORD`（或用 `DSH_PASSWORD_FILE` 指向文件）。留空则容器首次启动时随机生成一个并**只在日志里打印一次**——`docker logs <容器名>`，或 Docker 页 → 该容器 → Logs。用户名是 `dsh`。
+* **原理**：口令只通过浏览器自带的登录框校验一次（HTTP basic auth）；校验通过后发放一个 Cookie，其值是"口令 + 每套安装独立盐值"的 HMAC。此后普通请求**和客户端的 WebSocket 握手**都靠这个 Cookie 通行——浏览器不保证在 WebSocket 升级时携带缓存的 HTTP 凭据，这就是门禁不做成"每个请求都 basic"的原因。`/healthz` 保持免认证，容器健康检查不受影响。改口令（或删除 `/data/caddy/data/auth-gate-salt`）会让已签发的 Cookie 全部失效。
+* **口令走明文 HTTP 在公网并不安全**：门禁保护的是应用，不是链路。要暴露到局域网之外，必须在前面用反向代理终结 TLS；配合设置 `PUBLIC_URL`，容器就只应答那一个 authority。
+* **已经有 SSO？** 把 `AUTH_MODE` 设为 `none`，交给代理认证（SWAG + Authelia、Authentik……），`ALLOWED_CLIENTS` 仍作为第二层生效。其它 `AUTH_MODE` 取值一律 fail-closed。
 
 ## 更新与版本
 

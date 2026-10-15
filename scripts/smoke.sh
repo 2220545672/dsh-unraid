@@ -11,6 +11,10 @@
 #
 # What is asserted, and why each one matters:
 #   1. /healthz answers "ok"        — Caddy is up and the published port works.
+#  1b. / is 401 without credentials — the built-in password gate is on by default,
+#      a wrong password is refused, the right one mints a cookie that then carries
+#      the session (including for the WebSocket upgrade), and a forged cookie is
+#      refused. Without this block a regression could ship the UI wide open.
 #   2. / returns 303 + Set-Cookie   — the launch-token bootstrap works, i.e. a
 #                                     browser can authenticate without copying a
 #                                     token out of the container log.
@@ -35,6 +39,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# The image serves its own password gate by default (AUTH_MODE=builtin), so every
+# request that is meant to reach the application has to authenticate first. The
+# gate itself is asserted in its own block below.
+SMOKE_PASSWORD='smoke-test-password'
+SMOKE_AUTH=(--user "dsh:${SMOKE_PASSWORD}")
+
 pass() { printf 'ok   %s\n' "$*"; }
 fail() { printf 'FAIL %s\n' "$*"; FAILURES=$((FAILURES + 1)); }
 
@@ -47,6 +57,7 @@ printf 'starting %s\n' "${IMAGE}"
 # here. The strict default is asserted separately in the access-control section.
 docker run --detach --name "${NAME}" \
     --env 'ALLOWED_CLIENTS=127.0.0.1,172.16.0.0/12' \
+    --env "DSH_PASSWORD=${SMOKE_PASSWORD}" \
     --publish "127.0.0.1:${PORT}:8080" \
     --security-opt seccomp=unconfined \
     --security-opt systempaths=unconfined \
@@ -81,7 +92,7 @@ else
 fi
 
 # 2 — launch-token bootstrap
-HEADERS="$(curl --silent --show-error --max-time 5 --dump-header - --output /dev/null "http://127.0.0.1:${PORT}/" || true)"
+HEADERS="$(curl --silent --show-error --max-time 5 "${SMOKE_AUTH[@]}" --dump-header - --output /dev/null "http://127.0.0.1:${PORT}/" || true)"
 if grep --quiet --ignore-case --extended-regexp '^HTTP/[0-9.]+ 303' <<< "${HEADERS}"; then
     pass '/ answered 303 for the token bootstrap'
 else
@@ -95,6 +106,7 @@ fi
 
 # 3 — cross-site request must be refused by the DSH fence
 CROSS_SITE_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    "${SMOKE_AUTH[@]}" \
     --request POST \
     --header 'Sec-Fetch-Site: cross-site' \
     --header 'Content-Type: application/json' \
@@ -108,11 +120,69 @@ fi
 
 # 4 — Caddy keeps the native settings endpoints shut
 NATIVE_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    "${SMOKE_AUTH[@]}" \
     "http://127.0.0.1:${PORT}/api/settings.openDocument" || true)"
 if [[ "${NATIVE_CODE}" == "403" ]]; then
     pass 'the native open-document endpoint is gated (403)'
 else
     fail "the native open-document endpoint returned ${NATIVE_CODE}, expected 403"
+fi
+
+# 4b — the built-in password gate. A default install must not be usable by anybody
+# who can reach the port, so this is a security assertion, not a convenience one:
+# the UI answers 401 without credentials, a wrong password does not get in, the
+# right one mints a cookie, that cookie alone is enough afterwards, a forged
+# cookie is refused, and the WebSocket upgrade path (which the browser does not
+# reliably attach cached HTTP credentials to) accepts the cookie as well.
+GATE_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    "http://127.0.0.1:${PORT}/" || true)"
+GATE_HEADERS="$(curl --silent --dump-header - --output /dev/null --max-time 5 \
+    "http://127.0.0.1:${PORT}/" || true)"
+if [[ "${GATE_CODE}" == "401" ]] && grep --quiet --ignore-case '^www-authenticate:' <<< "${GATE_HEADERS}"; then
+    pass 'password gate: the UI answers 401 (with WWW-Authenticate) without credentials'
+else
+    fail "password gate: unauthenticated / returned ${GATE_CODE} without a challenge"
+fi
+WRONG_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    --user 'dsh:definitely-not-the-password' "http://127.0.0.1:${PORT}/" || true)"
+if [[ "${WRONG_CODE}" == "401" ]]; then
+    pass 'password gate: a wrong password is refused (401)'
+else
+    fail "password gate: a wrong password returned ${WRONG_CODE}, expected 401"
+fi
+GATE_TOKEN="$(curl --silent --dump-header - --output /dev/null --max-time 5 \
+    "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/" \
+    | tr -d '\r' | awk 'tolower($1) == "set-cookie:" && $2 ~ /^dsh_gate=/ { sub(/^dsh_gate=/, "", $2); sub(/;.*/, "", $2); print $2 }' | head -1 || true)"
+if [[ -n "${GATE_TOKEN}" ]]; then
+    pass 'password gate: the password mints a gate cookie'
+else
+    fail 'password gate: no dsh_gate cookie was issued after authenticating'
+fi
+COOKIE_ONLY_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    --header "Cookie: dsh_gate=${GATE_TOKEN}" "http://127.0.0.1:${PORT}/" || true)"
+if [[ "${COOKIE_ONLY_CODE}" == "303" || "${COOKIE_ONLY_CODE}" == "200" || "${COOKIE_ONLY_CODE}" == "302" ]]; then
+    pass 'password gate: the gate cookie alone carries the session'
+else
+    fail "password gate: cookie-only / returned ${COOKIE_ONLY_CODE}"
+fi
+FORGED_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    --header 'Cookie: dsh_gate=forged-value' "http://127.0.0.1:${PORT}/" || true)"
+if [[ "${FORGED_CODE}" == "401" ]]; then
+    pass 'password gate: a forged gate cookie is refused (401)'
+else
+    fail "password gate: a forged cookie returned ${FORGED_CODE}, expected 401"
+fi
+WS_BLOCKED="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    --header 'Connection: Upgrade' --header 'Upgrade: websocket' \
+    "http://127.0.0.1:${PORT}/api" || true)"
+WS_ALLOWED="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    --header "Cookie: dsh_gate=${GATE_TOKEN}" \
+    --header 'Connection: Upgrade' --header 'Upgrade: websocket' \
+    "http://127.0.0.1:${PORT}/api" || true)"
+if [[ "${WS_BLOCKED}" == "401" && "${WS_ALLOWED}" != "401" ]]; then
+    pass 'password gate: an upgrade request is refused without the cookie and passed with it'
+else
+    fail "password gate: upgrade returned ${WS_BLOCKED} unauthenticated and ${WS_ALLOWED} with the cookie"
 fi
 
 # 5 — bubblewrap
@@ -200,6 +270,7 @@ docker run --detach --name "${EDGE_NAME}" \
     --volume "${WORKDIR}/workspace-edge:/workspace" \
     --env 'ALLOWED_CLIENTS=127.0.0.1,172.16.0.0/12' \
     --env "PUBLIC_URL=http://127.0.0.1:${EDGE_PORT}" \
+    --env 'AUTH_MODE=none' \
     "${IMAGE}" >/dev/null
 
 edge_ready=0
@@ -213,6 +284,17 @@ if [[ "${edge_ready}" != "1" ]]; then
     docker logs "${EDGE_NAME}" || true
 else
     pass "edge mode: container starts with PUBLIC_URL set"
+fi
+
+# This container runs AUTH_MODE=none on purpose: its subject is the Host/Origin
+# contract with the proxy in front, and that is exactly the documented setting when
+# something else already authenticates. The gate assertions above cover builtin.
+EDGE_NO_GATE_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    "http://127.0.0.1:${EDGE_PORT}/" || true)"
+if [[ "${EDGE_NO_GATE_CODE}" != "401" ]]; then
+    pass 'AUTH_MODE=none serves the UI without a challenge (delegated authentication)'
+else
+    fail 'AUTH_MODE=none still demanded credentials'
 fi
 
 EDGE_ORIGIN="http://127.0.0.1:${EDGE_PORT}"

@@ -9,8 +9,10 @@
 #   * The upstream version is resolved from the npm registry (highest semver
 #     across every dist-tag), never from the `latest` tag alone — see
 #     scripts/resolve-dsh-version.mjs.
-#   * No built-in password auth: this image expects an edge proxy (SWAG,
-#     Authelia, ...) or a trusted LAN. AUTH_MODE other than `none` fails closed.
+#   * AUTH_MODE=builtin (the default) serves a password gate of its own, because a
+#     default install must not be usable by everybody who can reach the port.
+#     AUTH_MODE=none delegates authentication to an edge proxy (SWAG, Authelia,
+#     ...) or to a trusted network. Anything else fails closed.
 
 ARG NODE_VERSION=24.21.0
 ARG CADDY_VERSION=2.11.7
@@ -139,6 +141,10 @@ RUN set -eux; \
 # at /root, which uid 1000 cannot write, so `~/.ssh/config`, git config and tool
 # caches all failed until this was set. The previous community image had it right;
 # this one shipped without it once.
+# AUTH_MODE=builtin puts the container's own password gate in front of the UI;
+# DSH_PASSWORD / DSH_PASSWORD_FILE choose the password (or one is generated and
+# printed once). Set AUTH_MODE=none when an authenticating proxy or a trusted
+# network is in front — the entrypoint fails closed on any other value.
 ENV NODE_ENV=production \
     HOME=/home/node \
     PORT=8080 \
@@ -146,7 +152,7 @@ ENV NODE_ENV=production \
     DSH_HOME=/data/dsh \
     DSH_AGENTS_HOME=/data/dsh/agents \
     DSH_WORKSPACE=/workspace \
-    AUTH_MODE=none
+    AUTH_MODE=builtin
 
 VOLUME ["/data", "/workspace"]
 EXPOSE 8080

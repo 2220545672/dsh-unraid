@@ -35,6 +35,8 @@
 		respond "ok" 200
 	}
 
+	# PASSWORD_GATE — replaced by the entrypoint when AUTH_MODE=builtin
+
 	route /dsh-deployment.js {
 		header {
 			Content-Type "application/javascript; charset=utf-8"

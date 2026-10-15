@@ -21,8 +21,13 @@
 #          force: the Host fence cannot be forged by a rebound browser, and the
 #          fence still rejects Sec-Fetch-Site: cross-site.
 #
-# AUTH_MODE is intentionally limited to `none`: authentication belongs to the
-# edge proxy. Anything else fails closed instead of pretending to be safe.
+# AUTH_MODE decides who guards the UI:
+#   builtin (default) : the container's own password gate. The password comes from
+#                       DSH_PASSWORD or DSH_PASSWORD_FILE, or is generated and
+#                       printed once at startup.
+#   none              : authentication belongs to the edge proxy (SWAG/Authelia,
+#                       VPN, ...) or to a trusted network.
+# Anything else fails closed.
 set -Eeuo pipefail
 
 # The image's unprivileged `node` account. Fixed on purpose: the layered
@@ -33,7 +38,14 @@ APP_GID=1000
 
 PORT="${PORT:-8080}"
 DSH_INTERNAL_PORT="${DSH_INTERNAL_PORT:-3080}"
-AUTH_MODE="${AUTH_MODE:-none}"
+# AUTH_MODE unset means "whatever this image considers safe": a password gate,
+# because a default install must not be usable by everybody who can reach the port.
+AUTH_MODE="${AUTH_MODE:-builtin}"
+AUTH_USER="${AUTH_USER:-dsh}"
+AUTH_COOKIE_NAME="${AUTH_COOKIE_NAME:-dsh_gate}"
+AUTH_COOKIE_MAX_AGE="${AUTH_COOKIE_MAX_AGE:-604800}"
+DSH_PASSWORD="${DSH_PASSWORD:-}"
+DSH_PASSWORD_FILE="${DSH_PASSWORD_FILE:-}"
 DSH_HOME="${DSH_HOME:-/data/dsh}"
 DSH_AGENTS_HOME="${DSH_AGENTS_HOME:-${DSH_HOME}/agents}"
 DSH_WORKSPACE="${DSH_WORKSPACE:-/workspace}"
@@ -108,9 +120,11 @@ shutdown_children() {
     rm -f "${DSH_STARTUP_LOG}" 2>/dev/null || true
 }
 
-# The bundled Caddyfiles carry two markers. ACCESS_CONTROL is replaced by the
+# The bundled Caddyfiles carry three markers. ACCESS_CONTROL is replaced by the
 # rules built from ALLOWED_CLIENTS; TRUSTED_PROXIES is replaced by the Caddy
-# trusted-proxy options when TRUSTED_PROXY_CIDRS is set (and removed otherwise).
+# trusted-proxy options when TRUSTED_PROXY_CIDRS is set (and removed otherwise);
+# PASSWORD_GATE is replaced by the built-in password gate when AUTH_MODE=builtin
+# (and removed otherwise).
 render_caddyfile() {
     local source="$1" target="$2" line
     : > "${target}"
@@ -122,6 +136,11 @@ render_caddyfile() {
             *'# TRUSTED_PROXIES'*)
                 if (( ${#TRUSTED_BLOCK[@]} > 0 )); then
                     printf '%s\n' "${TRUSTED_BLOCK[@]}" >> "${target}"
+                fi
+                ;;
+            *'# PASSWORD_GATE'*)
+                if (( ${#GATE_BLOCK[@]} > 0 )); then
+                    printf '%s\n' "${GATE_BLOCK[@]}" >> "${target}"
                 fi
                 ;;
             *)
@@ -181,7 +200,10 @@ fi
 
 # ---------------------------------------------------------------- validation
 
-[[ "${AUTH_MODE}" == "none" ]] || fatal "AUTH_MODE='${AUTH_MODE}' is not supported by this image; it serves no authentication of its own (set AUTH_MODE=none and authenticate at the edge: SWAG/Authelia, VPN, or a trusted LAN)"
+case "${AUTH_MODE}" in
+    builtin|none) ;;
+    *) fatal "AUTH_MODE='${AUTH_MODE}' is not supported (use 'builtin' for the built-in password gate, or 'none' when an authenticating proxy or a trusted network is in front)" ;;
+esac
 
 validate_port PORT "${PORT}"
 validate_port DSH_INTERNAL_PORT "${DSH_INTERNAL_PORT}"
@@ -233,6 +255,103 @@ prepare_directory "${DSH_AGENTS_HOME}"
 prepare_directory "${DSH_WORKSPACE}"
 prepare_directory "${CADDY_CONFIG_HOME}"
 prepare_directory "${CADDY_DATA_HOME}"
+
+# ------------------------------------------------------------- password gate
+
+# AUTH_MODE=builtin serves a gate of our own: a fresh install must not be usable
+# by everyone who can reach the port. The password is asked for once through HTTP
+# basic auth, and that successful check mints a cookie whose value is an HMAC of
+# the password and a per-install salt. The cookie then carries the session for
+# ordinary requests *and* for the client's WebSocket handshake: browsers do not
+# reliably attach cached HTTP credentials to a WebSocket upgrade, which is why the
+# gate is not "basic auth on every request".
+#
+# Changing the password (or deleting the salt file) invalidates every issued cookie.
+GATE_BLOCK=()
+if [[ "${AUTH_MODE}" == "builtin" ]]; then
+    password=""
+    password_source=""
+    if [[ -n "${DSH_PASSWORD_FILE}" ]]; then
+        [[ -r "${DSH_PASSWORD_FILE}" ]] || fatal "DSH_PASSWORD_FILE is not readable: ${DSH_PASSWORD_FILE}"
+        # $(<file) already drops trailing newlines
+        password="$(<"${DSH_PASSWORD_FILE}")"
+        password_source="DSH_PASSWORD_FILE"
+    elif [[ -n "${DSH_PASSWORD}" ]]; then
+        password="${DSH_PASSWORD}"
+        password_source="DSH_PASSWORD"
+    else
+        password="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(12).toString("base64url"))')"
+        password_source="generated"
+    fi
+    (( ${#password} >= 8 )) || fatal "the password must be at least 8 characters (got ${#password}); set DSH_PASSWORD or DSH_PASSWORD_FILE"
+    [[ ! "${password}" =~ [[:space:]] ]] || fatal "the password must not contain whitespace"
+
+    salt_file="${CADDY_DATA_HOME}/auth-gate-salt"
+    if [[ ! -s "${salt_file}" ]]; then
+        node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))' > "${salt_file}"
+        chmod 0600 "${salt_file}"
+    fi
+    gate_secret="$(node -e '
+      const { createHmac } = require("node:crypto");
+      const fs = require("node:fs");
+      const salt = fs.readFileSync(process.argv[1], "utf8").trim();
+      process.stdout.write(createHmac("sha256", salt).update(process.argv[2]).digest("base64url"));
+    ' "${salt_file}" "${password}")"
+
+    password_hash="$(caddy hash-password --plaintext "${password}")" \
+        || fatal "could not hash the password (caddy hash-password failed)"
+
+    secure_flag=""
+    [[ "${PUBLIC_URL}" == https://* ]] && secure_flag="; Secure"
+
+    GATE_BLOCK=(
+        '	# --- password gate (AUTH_MODE=builtin; rendered by the entrypoint) ---'
+        '	# /healthz stays open so the container healthcheck keeps working.'
+        '	@dsh_gate_needed {'
+        '		not path /healthz'
+        "		not header Cookie *${AUTH_COOKIE_NAME}=${gate_secret}*"
+        '	}'
+        '	route @dsh_gate_needed {'
+        '		basic_auth {'
+        "			${AUTH_USER} ${password_hash}"
+        '		}'
+        "		header Set-Cookie \"${AUTH_COOKIE_NAME}=${gate_secret}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${AUTH_COOKIE_MAX_AGE}${secure_flag}\""
+        '	}'
+    )
+
+    if [[ "${password_source}" == "generated" ]]; then
+        log "authentication: built-in password gate, user '${AUTH_USER}' — GENERATED PASSWORD: ${password}"
+        log "                save it now; set DSH_PASSWORD (or DSH_PASSWORD_FILE) to choose your own"
+    else
+        log "authentication: built-in password gate, user '${AUTH_USER}' (password from ${password_source})"
+    fi
+    [[ -z "${PUBLIC_URL}" ]] || warn "AUTH_MODE=builtin with PUBLIC_URL set: if the proxy in front already authenticates, set AUTH_MODE=none to avoid a second login"
+    unset password password_hash
+elif [[ -n "${PUBLIC_URL}" ]]; then
+    log "authentication: none — delegated to the proxy in front (AUTH_MODE=none)"
+else
+    warn "AUTH_MODE=none: anybody who can reach this port can drive the agent (with access to the mounted workspace and stored credentials). Use it only on a trusted network or behind an authenticating proxy."
+fi
+
+# HOME must be readable and writable by the account we drop to. The base image
+# leaves it at /root, which uid 1000 cannot even list, and DSH surfaces that as a
+# bewildering failure deep inside the UI ("cannot list /root: EACCES") when a file
+# or workspace picker opens. The image sets HOME correctly; this repairs the case
+# anyway, because an unwritable HOME stays silent until something opens a picker,
+# and a forked or re-based build should not have to rediscover it.
+if [[ ! -d "${HOME}" || ! -w "${HOME}" ]]; then
+    fallback_home="/home/node"
+    # Best effort, and never fatal: with errexit on, an unguarded install would turn
+    # "the picker cannot list ~" into "the container refuses to start" on a read-only
+    # root filesystem. Only switch when the fallback is genuinely usable.
+    install -d -o "${APP_UID}" -g "${APP_GID}" -m 0755 "${fallback_home}" 2>/dev/null || true
+    if [[ -w "${fallback_home}" ]]; then
+        warn "HOME='${HOME}' is not writable by uid ${APP_UID}; using ${fallback_home} instead"
+        export HOME="${fallback_home}"
+    else
+        warn "HOME='${HOME}' is not writable by uid ${APP_UID} and ${fallback_home} is unavailable; leaving HOME unchanged"
+    fi
+fi
 
 if ! awk '$5 == "/data" { found = 1 } END { exit found ? 0 : 1 }' /proc/self/mountinfo; then
     warn "/data is not a mount point: sessions, credentials and the agent home will be lost when this container is recreated"
@@ -361,7 +480,7 @@ as_app_user env XDG_CONFIG_HOME="${CADDY_CONFIG_HOME}" XDG_DATA_HOME="${CADDY_DA
     caddy validate --config "${CADDY_CONFIG}" --adapter caddyfile \
     || fatal "the bundled Caddy configuration failed validation: ${CADDY_CONFIG}"
 
-log "starting Caddy on 0.0.0.0:${PORT} (auth delegated to the edge; AUTH_MODE=none)"
+log "starting Caddy on 0.0.0.0:${PORT} (auth=${AUTH_MODE})"
 as_app_user env XDG_CONFIG_HOME="${CADDY_CONFIG_HOME}" XDG_DATA_HOME="${CADDY_DATA_HOME}" \
     caddy run --config "${CADDY_CONFIG}" --adapter caddyfile &
 CADDY_PID=$!
