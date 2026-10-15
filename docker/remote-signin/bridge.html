@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Finish the sign-in · 完成登录</title>
+<script>/* Set before the body paints, so only one language ever flashes. */
+  document.documentElement.dataset.lang = /^zh/i.test(navigator.language || 'en') ? 'zh' : 'en';</script>
+<style>
+  :root { color-scheme: light dark; --fg:#1b1c1e; --muted:#5c6169; --line:#d9dbe0; --bg:#fff; --accent:#4d6bfe; --err:#c0392b; --ok:#1e874b; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e8e9ec; --muted:#a2a7b0; --line:#3a3d43; --bg:#16181c; --accent:#8ea2ff; --err:#ff8b7d; --ok:#5ddc9a; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif; }
+  main { max-width:44rem; margin:0 auto; padding:2.5rem 1.25rem 4rem; }
+  h1 { font-size:1.4rem; margin:0 0 .25rem; }
+  h2 { font-size:1rem; margin:2rem 0 .5rem; }
+  p, li { margin:.4rem 0; }
+  .muted { color:var(--muted); }
+  code { background:rgba(127,127,127,.14); border-radius:4px; padding:.1em .35em; font-size:.92em; word-break:break-all; }
+  textarea { width:100%; box-sizing:border-box; min-height:5.5rem; margin:.75rem 0; padding:.6rem .7rem; font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color:var(--fg); background:transparent; border:1px solid var(--line); border-radius:8px; resize:vertical; }
+  button { font:inherit; font-weight:600; color:#fff; background:var(--accent); border:0; border-radius:8px; padding:.55rem 1.1rem; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  ol { padding-left:1.25rem; }
+  .box { border:1px solid var(--line); border-radius:10px; padding:.9rem 1rem; margin:1rem 0; }
+  #status { margin-top:.9rem; min-height:1.6em; font-weight:600; }
+  #status.error { color:var(--err); font-weight:500; }
+  #status.ok { color:var(--ok); }
+  /* Only the active language is hidden/shown, so inline spans stay inline. */
+  html[data-lang="en"] .zh { display:none; }
+  html[data-lang="zh"] .en { display:none; }
+  kbd { font:inherit; border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 .3em; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span class="en">Finish the DeepSeek sign-in</span><span class="zh">完成 DeepSeek 账号登录</span></h1>
+  <p class="muted en">This page brings back an authorization code your browser could not deliver.</p>
+  <p class="muted zh">这个页面负责把浏览器没能送回的授权码带回来。</p>
+
+  <div class="box">
+    <ol class="en">
+      <li>The sign-in tab you just opened ends on an error like <em>“This site can’t be reached”</em> for <code>127.0.0.1</code>. That is expected: the platform only lets the login come back to a loopback address, which your browser cannot reach on this server.</li>
+      <li>Go to that tab, select the whole address bar (<kbd>Ctrl</kbd>+<kbd>L</kbd>), copy it (<kbd>Ctrl</kbd>+<kbd>C</kbd>).</li>
+      <li>Paste it below and continue. The last step happens here, on this server, and the sign-in page you started from turns green by itself.</li>
+    </ol>
+    <ol class="zh">
+      <li>刚才打开的登录标签页最后会停在一个 <code>127.0.0.1</code> 的“无法访问此网站”错误页。这是预期的：平台只允许登录结果回到回环地址，而你手上的浏览器访问不到服务器上的回环地址。</li>
+      <li>切到那个标签页，选中整个地址栏（<kbd>Ctrl</kbd>+<kbd>L</kbd>），复制（<kbd>Ctrl</kbd>+<kbd>C</kbd>）。</li>
+      <li>粘贴到下面并继续。最后一步在这台服务器上完成，原来那个登录窗口会自己变成已登录。</li>
+    </ol>
+  </div>
+
+  <label for="input" class="en">Address of the page that failed to open</label>
+  <label for="input" class="zh">那个打不开的页面的地址</label>
+  <textarea id="input" spellcheck="false" autocomplete="off"
+            placeholder="http://127.0.0.1:47821/oauth/callback?code=…&amp;state=…"></textarea>
+  <button id="go" type="button"><span class="en">Continue</span><span class="zh">继续</span></button>
+  <div id="status" role="status" aria-live="polite"></div>
+
+  <h2><span class="en">What this does with the code</span><span class="zh">这个页面拿授权码做什么</span></h2>
+  <p class="en">It sends <code>code</code> and <code>state</code> from the address you pasted to this same server, on the path DeepSeek Harness already uses for its own callback. The server checks the one-time <code>state</code> it created for the sign-in you started, exchanges the code with the PKCE verifier it kept in memory, and stores the resulting credential. Nothing is sent anywhere else, the code is single-use, and it expires with the attempt.</p>
+  <p class="zh">它只把你粘贴的地址里的 <code>code</code> 和 <code>state</code> 发到<b>本服务器</b>上 DeepSeek Harness 自己的回调路径。服务器会校验它为本次登录生成的<u>一次性</u> <code>state</code>，用在内存里的 PKCE verifier 换取凭据并保存。除此之外不发给任何地方；授权码一次性有效，且随本次登录尝试一起过期。</p>
+
+  <p class="muted en">Nothing to paste? Start over in the DSH tab, or use an API key instead.</p>
+  <p class="muted zh">没有可粘贴的地址？回到 DSH 标签页重新点一次登录，或改用 API Key。</p>
+</main>
+<script>
+(function () {
+  var zh = document.documentElement.dataset.lang === 'zh';
+  var say = function (message, kind) {
+    var status = document.getElementById('status');
+    status.textContent = message;
+    status.className = kind || '';
+  };
+
+  /**
+   * Pull `code` and `state` out of whatever the operator pasted: a full URL, a
+   * bare query string, or the URL with surrounding whitespace. Everything else
+   * in the address is dropped, so this page can never be used as a redirector:
+   * the only destination it can reach is this origin's own callback path.
+   */
+  var extract = function (raw) {
+    var text = String(raw || '').trim();
+    if (text.length === 0 || text.length > 4096) return null;
+    var query = text;
+    var mark = query.indexOf('?');
+    if (mark !== -1) {
+      var head = query.slice(0, mark);
+      query = query.slice(mark + 1);
+      var hash = query.indexOf('#');
+      if (hash !== -1) query = query.slice(0, hash);
+      if (head.indexOf('127.0.0.1') === -1 && head.indexOf('localhost') === -1 && head.indexOf('[::1]') === -1) return null;
+      if (head.indexOf('/oauth/callback') === -1) return null;
+    }
+    var params = new URLSearchParams(query);
+    var code = params.get('code');
+    var state = params.get('state');
+    if (!code || !state) return null;
+    if (params.getAll('code').length !== 1 || params.getAll('state').length !== 1) return null;
+    return { code: code, state: state };
+  };
+
+  var go = document.getElementById('go');
+  var input = document.getElementById('input');
+  // Enter submits (the textarea is single-purpose); Shift+Enter still adds a line.
+  input.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      go.click();
+    }
+  });
+  go.addEventListener('click', function () {
+    var pairs = extract(input.value);
+    if (pairs === null) {
+      say(zh
+        ? '这个地址看起来不是本次登录的回调地址。请复制那个 127.0.0.1 错误页面的完整地址（应包含 code= 与 state=）。'
+        : 'That does not look like the callback address of this sign-in. Copy the complete address of the 127.0.0.1 error page (it must contain code= and state=).', 'error');
+      return;
+    }
+    say(zh ? '正在完成登录…' : 'Finishing the sign-in…', 'ok');
+    var target = new URLSearchParams();
+    target.set('code', pairs.code);
+    target.set('state', pairs.state);
+    // Same origin, upstream's own callback path: the state is what authorises it.
+    location.replace('/oauth/callback?' + target.toString());
+  });
+})();
+</script>
+</body>
+</html>

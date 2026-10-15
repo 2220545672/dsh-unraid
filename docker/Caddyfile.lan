@@ -77,6 +77,21 @@
 		redir * /?token={$DSH_LAUNCH_TOKEN} 303
 	}
 
+	# Remote sign-in bridge (see docs/remote-signin.md). The DeepSeek platform only
+	# returns a browser sign-in to a loopback address, which no browser on the LAN
+	# or on Tailscale can reach. The overlay that claims such an address therefore
+	# leaves that browser on a dead 127.0.0.1 page — whose URL still carries `code`
+	# and `state`. This page hands exactly those two parameters back to DSH's own
+	# /oauth/callback *on this origin*, i.e. the same route with the same one-time
+	# `state` check a loopback browser would have hit directly.
+	@remote_login path /remote-login /remote-login/
+	route @remote_login {
+		header Cache-Control "no-store"
+		root * /etc/caddy/bridge
+		rewrite * /remote-login.html
+		file_server
+	}
+
 	@dsh_bootstrap {
 		path /
 		not header Cookie *dsh-auth-*

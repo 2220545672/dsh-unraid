@@ -13,6 +13,10 @@
 #     default install must not be usable by everybody who can reach the port.
 #     AUTH_MODE=none delegates authentication to an edge proxy (SWAG, Authelia,
 #     ...) or to a trusted network. Anything else fails closed.
+#   * DeepSeek *account* sign-in only works from a browser that can reach a
+#     loopback address, which a remote browser cannot. REMOTE_SIGNIN=on (the
+#     default) loads an overlay that claims such an address and serves the bridge
+#     page that finishes the flow — see docs/remote-signin.md.
 
 ARG NODE_VERSION=24.21.0
 ARG CADDY_VERSION=2.11.7
@@ -123,6 +127,12 @@ COPY --from=deps /app /app
 COPY --from=caddy /usr/local/bin/caddy /usr/local/bin/caddy
 COPY docker/entrypoint.sh docker/healthcheck.sh /usr/local/bin/
 COPY docker/Caddyfile.edge docker/Caddyfile.lan /etc/caddy/
+# The remote sign-in overlay (docs/remote-signin.md): a launcher patch entry plus
+# the plugin it points at, loaded only while REMOTE_SIGNIN=on, and the bridge page
+# Caddy serves at /remote-login. Nothing here is on the request path of a normal
+# session; the page is inert without a pending sign-in.
+COPY docker/remote-signin/dsh-remote-signin.mjs docker/remote-signin/patch.yml /etc/dsh/remote-signin/
+COPY docker/remote-signin/bridge.html /etc/caddy/bridge/remote-login.html
 
 RUN set -eux; \
     chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh /usr/local/bin/caddy; \

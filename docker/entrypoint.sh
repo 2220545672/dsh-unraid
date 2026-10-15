@@ -58,6 +58,20 @@ DSH_AGENTS_HOME="${DSH_AGENTS_HOME:-${DSH_HOME}/agents}"
 DSH_WORKSPACE="${DSH_WORKSPACE:-/workspace}"
 DSH_TRUSTED_HOSTS="${DSH_TRUSTED_HOSTS:-}"
 PUBLIC_URL="${PUBLIC_URL:-}"
+# Remote sign-in (see docs/remote-signin.md). The DeepSeek platform only returns a
+# browser sign-in to a loopback address, so a browser that is not on this machine
+# cannot sign in with an account at all. `on` (the default) loads the overlay that
+# claims such an address and serves the bridge page that finishes the flow; `off`
+# keeps upstream behaviour bit-for-bit. The claim is a loopback origin *string*
+# nothing ever listens on: any port works, and a port unlikely to be occupied on
+# the operator's own machine is chosen so a stray local service can never receive
+# the authorization code.
+REMOTE_SIGNIN="${REMOTE_SIGNIN:-on}"
+REMOTE_SIGNIN_ORIGIN="${REMOTE_SIGNIN_ORIGIN:-}"
+REMOTE_SIGNIN_DEFAULT_ORIGIN="http://127.0.0.1:47821"
+REMOTE_SIGNIN_DIR="/etc/dsh/remote-signin"
+REMOTE_SIGNIN_PATCH="${REMOTE_SIGNIN_DIR}/patch.yml"
+REMOTE_SIGNIN_ACTIVE=0
 
 CADDY_DIR="/etc/caddy"
 CADDY_CONFIG_HOME="${DSH_HOME%/dsh}/caddy/config"
@@ -211,6 +225,34 @@ case "${AUTH_MODE}" in
     builtin|none) ;;
     *) fatal "AUTH_MODE='${AUTH_MODE}' is not supported (use 'builtin' for the built-in password gate, or 'none' when an authenticating proxy or a trusted network is in front)" ;;
 esac
+
+# ------------------------------------------------------------- remote sign-in
+
+case "${REMOTE_SIGNIN}" in
+    on|off) ;;
+    *) fatal "REMOTE_SIGNIN='${REMOTE_SIGNIN}' is not supported (use 'on' to serve the /remote-login bridge, or 'off' for upstream's loopback-only sign-in)" ;;
+esac
+
+if [[ "${REMOTE_SIGNIN}" == "on" ]]; then
+    [[ -n "${REMOTE_SIGNIN_ORIGIN}" ]] || REMOTE_SIGNIN_ORIGIN="${REMOTE_SIGNIN_DEFAULT_ORIGIN}"
+    if [[ ! "${REMOTE_SIGNIN_ORIGIN}" =~ ^http://(127\.0\.0\.1|localhost|\[::1\]):([0-9]{1,5})$ ]]; then
+        fatal "REMOTE_SIGNIN_ORIGIN must be a loopback http origin with an explicit port, e.g. ${REMOTE_SIGNIN_DEFAULT_ORIGIN} (got '${REMOTE_SIGNIN_ORIGIN}')"
+    fi
+    remote_signin_port="${BASH_REMATCH[2]}"
+    (( 10#${remote_signin_port} >= 1 && 10#${remote_signin_port} <= 65535 )) \
+        || fatal "REMOTE_SIGNIN_ORIGIN has an out-of-range port: ${REMOTE_SIGNIN_ORIGIN}"
+
+    # The overlay is optional by construction: a broken or unreadable one must never
+    # be the reason an agent will not start, so every problem here only disables the
+    # feature (loudly) and leaves upstream's behaviour in place.
+    if [[ ! -r "${REMOTE_SIGNIN_PATCH}" || ! -r "${REMOTE_SIGNIN_DIR}/dsh-remote-signin.mjs" ]]; then
+        warn "REMOTE_SIGNIN=on but ${REMOTE_SIGNIN_DIR} is incomplete; account sign-in stays loopback-only"
+    elif ! node --check "${REMOTE_SIGNIN_DIR}/dsh-remote-signin.mjs" >/dev/null 2>&1; then
+        warn "the remote sign-in overlay does not parse; account sign-in stays loopback-only"
+    else
+        REMOTE_SIGNIN_ACTIVE=1
+    fi
+fi
 
 validate_port PORT "${PORT}"
 validate_port DSH_INTERNAL_PORT "${DSH_INTERNAL_PORT}"
@@ -426,7 +468,14 @@ trap shutdown_children TERM INT
 
 # ------------------------------------------------------------------ dsh web
 
-DSH_ARGS=(web --host 127.0.0.1 --port "${DSH_INTERNAL_PORT}" --no-open)
+# Launcher flags (`--profile`, `--patch`) come first on purpose: the dsh launcher
+# takes everything after the first token it does not recognise as the booted app's
+# own arguments, so the app flags have to follow the profile selection.
+DSH_ARGS=(--profile web)
+if (( REMOTE_SIGNIN_ACTIVE == 1 )); then
+    DSH_ARGS+=(--patch "${REMOTE_SIGNIN_PATCH}")
+fi
+DSH_ARGS+=(--host 127.0.0.1 --port "${DSH_INTERNAL_PORT}" --no-open)
 if [[ -n "${DSH_UPSTREAM_HOST}" ]]; then
     DSH_ARGS+=(--public-url "${PUBLIC_ORIGIN}" --trusted-host "${DSH_UPSTREAM_HOST}")
     for host in "${EXTRA_TRUSTED_HOSTS[@]}"; do
@@ -436,6 +485,13 @@ fi
 
 : > "${DSH_STARTUP_LOG}"
 log "starting DeepSeek Harness ${DSH_VERSION:-unknown} on 127.0.0.1:${DSH_INTERNAL_PORT} (mode=${MODE})"
+if (( REMOTE_SIGNIN_ACTIVE == 1 )); then
+    bridge_url="http://<this-host>:${PORT}/remote-login"
+    [[ -z "${PUBLIC_ORIGIN}" ]] || bridge_url="${PUBLIC_ORIGIN}/remote-login"
+    log "remote sign-in: account sign-in works from a remote browser — the login tab will end on a dead ${REMOTE_SIGNIN_ORIGIN} page, paste that address at ${bridge_url}"
+else
+    log "remote sign-in: off — account sign-in needs a browser on this machine (or an ssh -L tunnel); an API key works from anywhere"
+fi
 (
     cd "${DSH_WORKSPACE}"
     exec setpriv --reuid "${APP_UID}" --regid "${APP_GID}" --init-groups -- dsh "${DSH_ARGS[@]}"
@@ -487,7 +543,7 @@ if [[ -z "${DSH_UPSTREAM_HOST}" ]]; then
     DSH_UPSTREAM_HOST="127.0.0.1:${DSH_INTERNAL_PORT}"
 fi
 
-export PORT DSH_INTERNAL_PORT PUBLIC_URL PUBLIC_ORIGIN DSH_UPSTREAM_HOST DSH_LAUNCH_TOKEN MODE
+export PORT DSH_INTERNAL_PORT PUBLIC_URL PUBLIC_ORIGIN DSH_UPSTREAM_HOST DSH_LAUNCH_TOKEN MODE REMOTE_SIGNIN_ORIGIN
 
 # ------------------------------------------------------------------ caddy
 
