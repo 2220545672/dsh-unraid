@@ -110,6 +110,22 @@ docker run -d --name dsh --restart unless-stopped \
 
 在 Unraid 上更新：**Docker → 该容器 → force update**（或等它提示 apply update）。不需要改任何配置，`/data` 与 `/workspace` 里的内容都会保留。
 
+## 已知限制
+
+**单用户**：没有用户库、没有第二账号，能访问界面的人就是同一个工作区的所有者。鉴权请放在它前面（反向代理 / SSO / VPN），或者只让受信网络访问。
+
+**DeepSeek 账号登录要求"浏览器在回环地址上"**：账号流程会把浏览器的 `window.location.origin` 交给服务端，而客户端与**平台**都只接受 `http://localhost|127.0.0.1|[::1]:<端口>` 作为回调。实测（直接调 `https://platform.deepseek.com/auth-api/v0/dsh/auth_init`）：回环地址返回 `code:0`，而局域网、Tailscale、反向代理的 origin 一律返回 `50005 PAYLOAD_SCHEMA_MISMATCH`。
+
+由此带来：
+
+* 从局域网 / Tailscale / 反代域名访问时，点登录必然报「登录失败 / 操作未完成，请重试」，**重试无用**；
+* **改镜像也无法绕过**：容器内放宽校验只会把拒绝点后移到平台；平台只提供 `auth_init` / `auth_exchange` / `auth_cancel`，**没有设备码通道**可跳过浏览器回调；
+* 正确做法：**用 API Key**（同一面板里有「添加 API Key」，服务器部署就该这样），**或者一次性用隧道登录**——`ssh -p 1022 -L 3081:127.0.0.1:3081 root@<服务器>`，打开 `http://127.0.0.1:3081` 完成登录。凭据存在**服务端**（`/data/dsh` 的凭据库），所以**登录一次之后**，你随后从局域网或 Tailscale 访问也一直是已登录状态。
+
+**上游仍是预发布**：`@deepseek-ai/dsh` 目前只发 `alpha`/`rc`，本镜像跟随其中最高版本（见「更新与版本标签」）。
+
+**体积与拉取速度**：解压后约 1.09 GB；从 GHCR 匿名拉取在中国大陆测得约 1 MB/s（约 20 分钟）。见「测试与验证记录」。
+
 ## 常见问题
 
 **点了"登录"报「登录失败 / 操作未完成，请重试」**

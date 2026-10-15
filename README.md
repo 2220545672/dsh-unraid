@@ -110,6 +110,22 @@ The image follows upstream automatically: a new release is built, smoke-tested a
 
 To update on Unraid: **Docker → your container → force update** (or wait for the "apply update" hint). No configuration changes are needed, and everything in `/data` and `/workspace` is preserved.
 
+## Known limitations
+
+**Single-user only.** There is no user database and no second account: whoever reaches the UI acts as the same workspace owner. Authenticate in front of it (reverse proxy, SSO, VPN) or keep it on a trusted network.
+
+**DeepSeek account sign-in needs a loopback browser.** The account flow hands `window.location.origin` to the server, and both the client and the **platform** accept only `http://localhost|127.0.0.1|[::1]:<port>` as the callback. Measured against `https://platform.deepseek.com/auth-api/v0/dsh/auth_init`: the loopback URL returns `code:0`, while LAN, Tailscale and reverse-proxy origins return `50005 PAYLOAD_SCHEMA_MISMATCH`.
+
+Consequences:
+
+* From a LAN, Tailscale or proxied URL the sign-in button always fails ("登录失败 / 操作未完成，请重试"), and retrying cannot help.
+* **No image change can lift this.** Patching the check inside the container would only move the rejection one step later, to the platform. The platform exposes just `auth_init`, `auth_exchange` and `auth_cancel` — there is no device-code channel that skips the browser callback.
+* **Use an API key** (the same panel offers *Add API key*) — that is what a server deployment should do — **or sign in once through a loopback tunnel**: `ssh -p 1022 -L 3081:127.0.0.1:3081 root@<server>`, open `http://127.0.0.1:3081`, sign in. The grant is stored **server-side** (`/data/dsh` credentials), so a single tunnel sign-in keeps you signed in when you later browse from LAN or Tailscale.
+
+**Upstream is a prerelease.** `@deepseek-ai/dsh` currently publishes only `alpha`/`rc` builds, and this image tracks the newest of them (see [Updating and version tags](#updating-and-version-tags)).
+
+**Image size and pull speed.** ~1.09 GB unpacked; pulling anonymously from GHCR measured around 1 MB/s on a China line (~20 minutes). See [Testing and verification](#testing-and-verification).
+
 ## FAQ
 
 **DeepSeek account sign-in fails with "登录失败 / 操作未完成，请重试" (or "Login failed, please retry")**
