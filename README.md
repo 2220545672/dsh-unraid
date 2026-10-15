@@ -105,11 +105,11 @@ docker run -d --name dsh --restart unless-stopped \
 
 ## 为什么还需要这个镜像
 
-社区里已有其它 DSH 打包（[runzhliu/deepseek-harness-docker](https://github.com/runzhliu/deepseek-harness-docker)、[okxlin 的运行时镜像](https://github.com/okxlin/release-factory)）。本仓库的差异是三个具体问题：
+社区里已有其它 DSH 打包（[runzhliu/deepseek-harness-docker](https://github.com/runzhliu/deepseek-harness-docker)、[okxlin 的运行时镜像](https://github.com/okxlin/release-factory)）。选这个镜像的理由是三个能立刻感受到的差异：
 
-1. **跟版信号不能踩坑。** `@deepseek-ai/dsh` 的 npm `latest` 标签会**落后于** `alpha`：2026-10-15 实测 `latest` 仍是 `0.2.0-rc.2`，而 `alpha` 已是 `0.2.1-alpha.3`。只读 `latest` 的流水线会**静默降级**。本仓库枚举全部已发布版本，按 semver 取最高（预发布按规范参与比较）。
-2. **默认适配 Unraid 的沙箱现实。** 见下一节。
-3. **不做"看起来有认证"的假象。** 镜像里除 `AUTH_MODE=none` 以外的取值一律 fail-closed，鉴权明确交给边缘。
+- **沙箱开箱可用** —— `bubblewrap` 与它需要的启动参数都在模板里，不必自己去查"为什么命令工具一直报 `SANDBOX_UNAVAILABLE`"。
+- **不会被跟版逻辑坑** —— 始终跟上游最高版本重建，不会因为上游发布标签的顺序而静默停在旧版本。
+- **不假装有认证** —— 不提供弱密码登录，鉴权明确交给边缘（反代 + SSO、VPN 或受信内网）。
 
 ## 沙箱：两个 `--security-opt` 为什么不能删
 
@@ -175,16 +175,16 @@ Unraid 只有在镜像 digest 变化时才会重建容器；先在 Docker 页点
 
 ## 测试与验证
 
-每次发布前，镜像都会在 CI 里真实启动并通过冒烟断言；仓库本身另有一道静态闸门（`scripts/check-static.sh`，`validate` 与 `release` 两个工作流共用，因此**检查不过的提交不可能发布出镜像或 Release 资产**）。
+每次发布前，镜像都会在 CI 里真实启动并通过冒烟断言；仓库与模板也有自动化检查，检查不过就不会发布。下面是这些检查覆盖的范围。
 
 | 验证项 | 内容 |
 |---|---|
 | CI 冒烟（每次发版） | lan 模式：`/healthz` = ok、`/` 返回 303 且下发 `dsh-auth-*`、跨站 `/api` 被 403、受管端点被 403、两个 Caddyfile 通过 `caddy validate`、容器内 `bwrap` 可用；edge 模式：容器起得来、外来 Origin 被 403、声明的 Origin 可达 DSH |
 | 目标平台验收 | 在 Unraid 7.3.2 / 内核 `6.18.38-Unraid` 上：edge 模式启动 → `/healthz` = ok → `/` 返回 **303** 且下发 `dsh-auth-*` cookie → 容器内 `bwrap … echo SANDBOX_OK` 输出 **SANDBOX_OK** |
 | 发布物 | 多架构 index（amd64 + arm64）与 SBOM/provenance；未登录匿名 `docker pull` 实测成功 |
-| 模板与仓库 | CA 的 minimum/recommended 字段、`ca_profile.xml` 门槛、卷与 `Config` 路径一致性、图标可复现，均由闸门断言 |
+| 模板与仓库 | CA 的 minimum/recommended 字段、`ca_profile.xml` 门槛、卷与 `Config` 路径一致性、图标一致性，全部由自动化检查断言 |
 
-> 目标平台验收曾抓出一个 CI 漏掉的真实缺陷：token 匹配把端口写死成内部端口，而 edge 模式下 DSH 按对外地址打印，导致 Caddy 不启动、界面打不开。修复后已把 edge 模式断言补进 CI。
+发布物与检查脚本都在本仓库里，可自行复现；维护者视角的流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 文档
 
