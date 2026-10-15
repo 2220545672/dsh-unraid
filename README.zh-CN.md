@@ -85,7 +85,7 @@ docker run -d --name dsh --restart unless-stopped \
 | `PUBLIC_URL` | 空 | 对外 origin，例如 `https://dsh.example.com`（只填协议 + 主机名，不要带路径）。设置后进入 **edge 模式**；留空为 **lan 模式**。 |
 | `DSH_TRUSTED_HOSTS` | 空 | 额外可信的 authority，逗号分隔（如 `dsh.example.com,192.168.1.10:8080`）。仅 edge 模式生效。 |
 | `TZ` | `Asia/Shanghai` | 容器时区。 |
-| `AUTH_MODE` | `none` | 唯一支持的值；填其它值容器会拒绝启动并说明原因。 |
+| `AUTH_MODE` | `none` | 唯一接受的值，而且这是个**有意的防呆闸门**，不是历史遗留。同类镜像是在容器内做认证的，它们的 `AUTH_MODE` **默认就是 `caddy-security`**；本镜像有意不提供任何自带认证。所以当你把旧配置（带着 `caddy-security`/`dsh`/别的值）迁过来时，容器会**拒绝启动并说明原因**，而不是"照常起来但完全没有认证"——**fail closed，而不是 fail open**。把它设成 `none`，认证放在前面（反代 + SSO、VPN，或受信内网）。 |
 
 **卷属主**：启动脚本会把两个卷改成 `1000:1000`（镜像内的 `node` 账户）。**不要**改成 `99:100`。
 

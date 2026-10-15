@@ -85,7 +85,7 @@ Then open `http://<your-server>:8080`. **You do not need to copy a token URL out
 | `PUBLIC_URL` | empty | Public origin, e.g. `https://dsh.example.com` (scheme + host only, no path). Setting it enables **edge mode**; leaving it empty is **lan mode**. |
 | `DSH_TRUSTED_HOSTS` | empty | Extra accepted authorities, comma separated (e.g. `dsh.example.com,192.168.1.10:8080`). Edge mode only. |
 | `TZ` | `Asia/Shanghai` | Container time zone. |
-| `AUTH_MODE` | `none` | The only supported value; any other value makes the container refuse to start and say why. |
+| `AUTH_MODE` | `none` | The only accepted value, and it is a deliberate interlock rather than a leftover. Other packaging of this app authenticates inside the container, and their `AUTH_MODE` **defaults to `caddy-security`**; this image deliberately ships no authentication of its own. So if a migrated configuration arrives carrying `caddy-security`, `dsh` or anything else, the container **refuses to start with an explanation** instead of booting wide open while its owner believes a login is in place — failing closed rather than failing open. Set it to `none` and authenticate in front (reverse proxy + SSO, VPN, or a trusted LAN). |
 
 **Volume ownership:** the entrypoint takes ownership as `1000:1000` (the `node` account inside the image). Do **not** change it to `99:100`.
 
