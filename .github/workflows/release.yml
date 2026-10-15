@@ -116,6 +116,7 @@ jobs:
           load: true
           platforms: linux/amd64
           tags: dsh-verify:${{ needs.resolve.outputs.version }}
+          cache-from: type=gha,scope=publish
           build-args: |
             DSH_VERSION=${{ needs.resolve.outputs.version }}
             NODE_VERSION=${{ needs.resolve.outputs.node }}
@@ -153,6 +154,8 @@ jobs:
           push: true
           provenance: true
           sbom: true
+          cache-from: type=gha,scope=publish
+          cache-to: type=gha,mode=max,scope=publish
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.resolve.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
