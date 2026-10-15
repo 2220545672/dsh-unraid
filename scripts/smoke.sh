@@ -200,4 +200,70 @@ fi
 
 docker rm -f "${EDGE_NAME}" >/dev/null 2>&1 || true
 
+# 9 — access control (ALLOWED_CLIENTS). The allowlist is enforced by a Caddy
+#     handle block; getting that placement wrong is silent (the request simply
+#     reaches the app), so it is asserted here from a real foreign address: a
+#     second container on its own network, whose address is never loopback.
+AC_NET="dsh-smoke-net-$$"
+AC_NAME="dsh-smoke-ac-$$"
+mkdir -p "${WORKDIR}/data-ac" "${WORKDIR}/workspace-ac"
+if docker network create "${AC_NET}" >/dev/null 2>&1; then
+    docker run --detach --name "${AC_NAME}" --network "${AC_NET}" \
+        --volume "${WORKDIR}/data-ac:/data" \
+        --volume "${WORKDIR}/workspace-ac:/workspace" \
+        --env 'ALLOWED_CLIENTS=127.0.0.1' \
+        "${IMAGE}" >/dev/null
+
+    ac_ready=0
+    for _ in $(seq 1 60); do
+        if docker exec "${AC_NAME}" curl --silent --fail --max-time 3 http://127.0.0.1:8080/healthz >/dev/null 2>&1; then
+            ac_ready=1
+            break
+        fi
+        if [[ "$(docker inspect --format '{{.State.Running}}' "${AC_NAME}" 2>/dev/null)" != "true" ]]; then break; fi
+        sleep 2
+    done
+
+    if [[ "${ac_ready}" != "1" ]]; then
+        fail 'access control: the container never answered on loopback'
+        docker logs "${AC_NAME}" || true
+    else
+        pass 'access control: loopback is always allowed (healthcheck path works)'
+        CLIENT_IP="$(docker run --rm --network "${AC_NET}" --entrypoint sh "${IMAGE}" -c 'hostname -i' 2>/dev/null | tr -d '\r' | awk '{print $1}')"
+        DENIED_CODE="$(docker run --rm --network "${AC_NET}" --entrypoint /usr/bin/curl "${IMAGE}" \
+            --silent --output /dev/null --write-out '%{http_code}' --max-time 8 \
+            "http://${AC_NAME}:8080/healthz" || true)"
+        if [[ "${DENIED_CODE}" == "403" ]]; then
+            pass "access control: ${CLIENT_IP:-a foreign client} is refused (403)"
+        else
+            fail "access control: a client outside ALLOWED_CLIENTS got ${DENIED_CODE}, expected 403"
+        fi
+
+        CLIENT_CIDR="$(awk -F. '{print $1"."$2"."$3".0/24"}' <<< "${CLIENT_IP}")"
+        docker rm -f "${AC_NAME}" >/dev/null 2>&1 || true
+        docker run --detach --name "${AC_NAME}" --network "${AC_NET}" \
+            --volume "${WORKDIR}/data-ac:/data" \
+            --volume "${WORKDIR}/workspace-ac:/workspace" \
+            --env "ALLOWED_CLIENTS=127.0.0.1,${CLIENT_CIDR}" \
+            "${IMAGE}" >/dev/null
+        for _ in $(seq 1 60); do
+            docker exec "${AC_NAME}" curl --silent --fail --max-time 3 http://127.0.0.1:8080/healthz >/dev/null 2>&1 && break
+            sleep 2
+        done
+        ALLOWED_CODE="$(docker run --rm --network "${AC_NET}" --entrypoint /usr/bin/curl "${IMAGE}" \
+            --silent --output /dev/null --write-out '%{http_code}' --max-time 8 \
+            "http://${AC_NAME}:8080/healthz" || true)"
+        if [[ "${ALLOWED_CODE}" == "200" ]]; then
+            pass "access control: ${CLIENT_CIDR} is allowed once listed (200)"
+        else
+            fail "access control: ${CLIENT_CIDR} returned ${ALLOWED_CODE} after being listed, expected 200"
+        fi
+    fi
+
+    docker rm -f "${AC_NAME}" >/dev/null 2>&1 || true
+    docker network rm "${AC_NET}" >/dev/null 2>&1 || true
+else
+    printf 'skip access-control check: could not create a test network\n'
+fi
+
 printf '\nall smoke checks passed\n'

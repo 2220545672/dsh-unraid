@@ -145,9 +145,14 @@ for entry in "${allowed_entries[@]}"; do
     entry="$(trim "${entry}")"
     [[ -n "${entry}" ]] || continue
     if [[ "${entry}" =~ ^[0-9A-Fa-f:.]+(/[0-9]{1,3})?$ && "${entry}" =~ [0-9] ]]; then
-        ALLOWED_IPS+=("${entry}")
+        # skip duplicates so the generated matcher stays readable
+        duplicate=0
+        for seen in "${ALLOWED_IPS[@]}"; do [[ "${seen}" == "${entry}" ]] && duplicate=1; done
+        (( duplicate == 1 )) || ALLOWED_IPS+=("${entry}")
     elif [[ "${entry}" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$ ]]; then
-        ALLOWED_HOSTS+=("${entry}")
+        duplicate=0
+        for seen in "${ALLOWED_HOSTS[@]}"; do [[ "${seen}" == "${entry}" ]] && duplicate=1; done
+        (( duplicate == 1 )) || ALLOWED_HOSTS+=("${entry}")
     else
         fatal "ALLOWED_CLIENTS entries must be IP addresses, CIDRs or hostnames (got '${entry}')"
     fi
@@ -248,15 +253,23 @@ fi
 # template (the markers are documented in docker/Caddyfile.*).
 ACCESS_BLOCK=(
     "	# generated from ALLOWED_CLIENTS=${ALLOWED_CLIENTS}"
-    "	@clients_denied not remote_ip ${ALLOWED_IPS[*]}"
-    '	respond @clients_denied "403 Forbidden: this client is not listed in ALLOWED_CLIENTS" 403'
+    "	handle {"
+    "		@clients_denied not remote_ip ${ALLOWED_IPS[*]}"
+    '		respond @clients_denied "403 Forbidden: this client is not listed in ALLOWED_CLIENTS" 403'
 )
 if (( ${#ALLOWED_HOSTS[@]} > 0 )); then
     ACCESS_BLOCK+=(
-        "	@host_denied not host ${ALLOWED_HOSTS[*]}"
-        '	respond @host_denied "403 Forbidden: this Host is not listed in ALLOWED_CLIENTS" 403'
+        "		@host_denied not host ${ALLOWED_HOSTS[*]}"
+        '		respond @host_denied "403 Forbidden: this Host is not listed in ALLOWED_CLIENTS" 403'
     )
 fi
+# The rules must live inside a handle block. Measured behaviour of the bundled
+# Caddyfiles: a bare `respond` at site level is ordered after `route`, and a
+# matcher-less `route` loses to the `route /healthz` that follows it, so both
+# spellings let a foreign client straight through to /healthz (200). A `handle`
+# block is evaluated first, and because its handlers only fire for denied
+# clients, permitted requests fall through to the real routes untouched.
+ACCESS_BLOCK+=("	}")
 
 TRUSTED_BLOCK=()
 if (( ${#TRUSTED_PROXY_LIST[@]} > 0 )); then
