@@ -124,7 +124,9 @@ docker run -d --name dsh --restart unless-stopped \
 
 **上游仍是预发布**：`@deepseek-ai/dsh` 目前只发 `alpha`/`rc`，本镜像跟随其中最高版本（见「更新与版本标签」）。
 
-**体积与拉取速度**：解压后约 1.09 GB；从 GHCR 匿名拉取在中国大陆测得约 1 MB/s（约 20 分钟）。见「测试与验证记录」。
+**体积与拉取速度**：解压后约 **0.67 GB**（0.2.1-alpha.3 起从 1.09 GB 瘦身；构建期清理了运行时不加载的 TypeScript 源码/类型声明/source map/文档/测试目录），从 GHCR 匿名拉取在中国大陆测得约 1 MB/s。见「测试与验证记录」。
+
+**不内置文档预览引擎**：镜像排除了 `@deepseek-ai/libreoffice-kit-wasm`（146 MB，侧栏 Office 文档预览用的 OOXML→PDF 引擎）——对编码智能体而言它是纯粹的下载负担，却让每个用户都要多下 146 MB。启动、插件与其它功能不受影响。需要该转换能力就用 `--build-arg WITH_LIBREOFFICE_ASSETS=1` 自行构建。
 
 ## 常见问题
 
