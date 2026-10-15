@@ -14,7 +14,7 @@
 | A1 | **仓库根目录必须有 `ca_profile.xml`，且 `<Profile>` 非空**，否则"CA will block submission finalization" | 官方《Repository Information XML》 | ✅ 已补 [`ca_profile.xml`](../ca_profile.xml)（含 Profile / Icon / WebPage，`<Forum>` 留注释待填） |
 | A2 | 仓库必须**公开、活跃**，且根目录有 **OSI 认可许可证** | 官方《Submission Help》 | ✅ 公开仓库 + MIT `LICENSE` |
 | A3 | 每个应用条目必须有 `<Repository>`（Docker）或 `<PluginURL>`（插件） | 官方《Repository XML Format》 | ✅ `<Repository>` 指向 `ghcr.io/2220545672/dsh:latest` |
-| A4 | 提交后要跑 **Validate / Scan**，且"每次有意义的 XML 改动后都要重跑" | 官方《Submission Help》 | ⚠️ 这一步只能在你的 Unraid 上做（见 [ca-submission.md](ca-submission.zh-CN.md)） |
+| A4 | 提交时要跑 **Validate / Scan**，官方另写"每次有意义的 XML 改动后都要重跑" | 官方《Submission Help》 | ⚠️ 那句只对**新提交**成立：已收录仓库会被 `/submit/new` 拒绝（回"already enabled … no action required"），模板改动由 CA 在下一次 feed 重建时自动重解析（2026-10-16 实测：02:00 CST 推送 → 04:11 CST 生效）。见 [ca-submission.md](ca-submission.zh-CN.md) |
 | A5 | **`:latest` 标签不存在会被拉黑**（实例：`ntop/ntopng is blacklisted with ":Latest tag does not exist"`） | 论坛 | ✅ 流水线**永远**同时推 `:latest` 与 `:<版本>`；不要改成只推版本号 |
 | A6 | **声明与实际不符会被下架**：Unspin 因 `PluginURL` 与 .plg 内声明不一致被 CA 移除，修好后**仍需 moderator 手工重新上架**，等了数天 | 论坛 | ⚠️ `<Repository>`/`<TemplateURL>`/`<Registry>`/`<Icon>` 一律指向稳定、真实、短期内不会迁移的位置；**镜像与仓库名一旦提交就不要改** |
 | A7 | **`Mask="true"` 只影响 GUI 显示**：值照样传给容器、也照样存在模板文件里（实测：`Mask="true"` + `my-own-secret-99` → 容器拿到 `DSH_PASSWORD=my-own-secret-99`；模板里也仍是这个值）。⚠️ 此前本条曾写成"遮蔽会让变量丢失"，那是**我们自己的检查脚本**用 `printf "%.11s"` 截断 `DSH_PASSWORD`（12 字符）导致比较永不成立而看漏的，已订正 | 本机对照实验（Mask true/false 两次重建）+ 直接 `grep '^DSH_PASSWORD'` | ✅ **Password** 字段用 `Mask="true"`（界面圆点）且值只写在 `Default` 里；`scripts/check-template.mjs` 不再禁止 Mask，只在注释里记录这段教训 |

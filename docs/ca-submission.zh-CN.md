@@ -2,7 +2,7 @@
 
 # 把模板提交到 Unraid Community Applications
 
-**状态：已收录。** 模板已提交，自 2026-10-15 起在目录中上线（按 CA 实际下发的 feed 复核：`DSH` 条目一条，由 `main` 上的 `templates/dsh.xml` 解析而来）。下面的清单保留给下一次提交——fork、另建仓库，或条目万一被下架后重新提交；而**每次有意义的 XML 改动后都要重跑的那一步是 Validate → Scan**。
+**状态：已收录。** 模板已提交，自 2026-10-15 起在目录中上线（按 CA 实际下发的 feed 复核：`DSH` 条目一条，由 `main` 上的 `templates/dsh.xml` 解析而来）。下面的清单保留给下一次提交——fork、另建仓库，或条目万一被下架后重新提交。**条目已上线时，发布模板改动并不需要重跑这个流程：** `/submit/new` 会回"已在 Community Applications 中启用、无需提交"，而 CA 会在下一次 feed 重建时自行重新解析仓库——2026-10-16 实测：02:00 CST 推送的模板，04:11 CST 就出现在 feed 里，全程没有手动 Scan（两次 feed 重建相隔约 4 h）。
 
 面向本仓库维护者（fork 后同理）。**先读 [ca-pitfalls.md](ca-pitfalls.zh-CN.md)**：那是官方文档 + 论坛实证整理出的坑清单，含"声明不符被下架""模板改动不回流到已安装机器""废弃即失去安全更新"等真实后果。这里只讲操作顺序。
 
@@ -14,7 +14,7 @@
 | 根目录有 **OSI 认可许可证** | 同上 | ✅ MIT |
 | 根目录有 **`ca_profile.xml` 且 `<Profile>` 非空** | Docs → Repository Information XML | ✅（`<Forum>` 已填支持帖） |
 | 每个应用条目有 `<Repository>`（Docker） | Docs → Repository XML Format | ✅ |
-| 提交时跑 **Validate → Scan**（入口是 **`/submit/new`**），且每次有意义的 XML 改动后重跑 | Docs → Submission Help / Builder Guide | ✅ 已完成——2026-10-15 提交、条目已上线；此后每次有意义的 XML 改动都要重跑 |
+| **新仓库**提交时跑 **Validate → Scan**（入口是 **`/submit/new`**） | Docs → Submission Help / Builder Guide | ✅ 已完成——2026-10-15 提交、条目已上线。已收录后这个流程跑不了（回"already enabled … no action required"）；模板改动由**下一次 feed 重建**带上（2026-10-16 实测：02:00 CST 推送 → 04:11 CST 生效） |
 | 仓库布局符合官方建议：根目录 `README.md`、`LICENSE`、`.gitignore`、**`icon.svg`**、`ca_profile.xml`，模板放在 `templates/` | Docs → Builder Guide | ✅ 已补齐 `icon.svg`（矢量，由 `scripts/make-icon-svg.mjs` 生成）；布局由 `scripts/check-repo.mjs` 断言 |
 | 不能留着 starter 的占位值（官方原文：占位图标"会被提交流程拒绝"） | Docs → Builder Guide | ✅ `check-repo.mjs` 会扫 `YOUR_GITHUB_USERNAME`/`example-app` 等占位值 |
 
@@ -63,7 +63,7 @@ CA 与模板指南都要求：**你自己维护的容器必须有 Unraid 论坛�
 
 ## 四、在 CA 界面提交
 
-`ca.unraid.net` 的 **Submit** 工作区：填仓库地址 → **Validate**（解析 XML）→ **Scan**（重复应用与门槛检查）→ 预览 listing → 提交。**每次有意义的 XML 改动后都要重跑**，解析器会按最新模板重新生成 feed 条目。
+`ca.unraid.net` 的 **Submit** 工作区：填仓库地址 → **Validate**（解析 XML）→ **Scan**（重复应用与门槛检查）→ 预览 listing → 提交。这个流程只用于**新提交**：已收录条目会被它拒绝执行；而解析器会在每次 feed 重建（约 4 h 一次）时按最新模板重新生成 feed 条目，**不需要手动重扫**。
 
 其中"证明仓库归属"这一步会要求你在仓库里放一个 `.unraid/community-apps-claim.json`——**它不是密钥**，只有公开 nonce 与 claim code，由该流程生成后再提交进仓库。本仓库刻意不含此文件：必须由你走一次流程拿到与自己账号对应的那份。
 
