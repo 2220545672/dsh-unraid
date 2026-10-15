@@ -86,12 +86,12 @@ jobs:
           PY
 
       - name: Hadolint
-        run: |
-          # Pass the file as an argument with the repository mounted: hadolint only
-          # discovers .hadolint.yaml next to the Dockerfile it is given, and reading
-          # stdin instead silently ignored our ignore list and failure threshold.
-          docker run --rm --volume "${PWD}:/workspace" --workdir /workspace \
-            hadolint/hadolint:latest Dockerfile
+        # The official action (rather than the container image, which exposes no
+        # entrypoint and therefore ignored .hadolint.yaml when fed via stdin).
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          config: .hadolint.yaml
 
       - name: Caddy configuration
         run: |
