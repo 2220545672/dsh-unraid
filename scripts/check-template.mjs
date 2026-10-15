@@ -10,7 +10,8 @@
  * Exits non-zero on errors; warnings do not fail the run.
  */
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { existsSync } from 'node:fs'
 import process from 'node:process'
 
 const file = resolve(process.argv[2] ?? 'templates/dsh.xml')
@@ -47,6 +48,27 @@ const repository = tag('Repository')
 if (!/^[\w.-]+(\/[\w.-]+)+(:[\w.-]+)?$/.test(repository)) errors.push(`<Repository> does not look like an image reference: "${repository}"`)
 else notes.push(`image: ${repository}`)
 if (repository.endsWith(':latest')) notes.push('image tag is latest (CA convention; the release workflow also ships version-pinned templates)')
+
+// 3b — the fields the CA docs list as minimum/recommended (Repository XML Format
+//      plus the parser field catalog): without them a scan or a reviewer bounces it
+const REQUIRED_TAGS = ['Name', 'Repository', 'Category', 'Icon', 'Overview', 'Project', 'Support', 'TemplateURL']
+for (const tagName of REQUIRED_TAGS) {
+  if (tag(tagName) === '') errors.push(`<${tagName}> is empty; the Community Apps docs list it as minimum or recommended`)
+}
+
+// 3c — ca_profile.xml is a hard submission gate: exact name, repository root, non-empty <Profile>
+const profilePath = resolve(dirname(file), '..', 'ca_profile.xml')
+if (existsSync(profilePath)) {
+  const profile = readFileSync(profilePath, 'utf8')
+  const profileText = (/<Profile>([\s\S]*?)<\/Profile>/.exec(profile) ?? [, ''])[1].trim()
+  if (profileText === '') errors.push('ca_profile.xml has an empty <Profile>; CA blocks submission finalization in that case')
+  else notes.push(`ca_profile.xml: <Profile> ${profileText.length} chars`)
+  for (const tagName of ['Icon', 'WebPage']) {
+    if (tag(tagName) === '' && !profile.includes(`<${tagName}>`)) warnings.push(`ca_profile.xml does not set <${tagName}> (recommended)`)
+  }
+} else {
+  notes.push('ca_profile.xml not found beside the repository root (expected when checking a rendered copy outside the repo)')
+}
 
 // 4 — links
 for (const field of ['Registry', 'Project', 'Icon']) {

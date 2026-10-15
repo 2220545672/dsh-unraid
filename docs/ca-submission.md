@@ -5,6 +5,20 @@
 - **`selfhosters/unRAID-CA-templates`（老路）已经停止接收新模板**。该仓库的新模板 PR 模板原文：*"We are no longer accepting new proposals, this issue will be closed."* README 也写明原作者维护意愿下降，并建议作者"拿到自己的 template repo in CA"。别把 PR 花在这里。
 - **现在的正规做法是"自建模板仓库 + CA 里 claim"**：仓库根目录提交 `.unraid/community-apps-claim.json`，CA 就会把它当作模板仓库收录。这个文件里只有一个公开 nonce 与 claim code，**不是密钥**，由 CA 的 claim 页面生成。
 
+> **先读 [ca-pitfalls.md](ca-pitfalls.md)**：那是官方文档 + 论坛实证整理出的"前人踩过的坑"清单，含下架、废弃、模板改动不回流等真实后果。下面只讲操作顺序。
+
+## 官方硬性门槛（缺一项就卡在提交环节）
+
+| 要求 | 依据 | 本仓库状态 |
+|---|---|---|
+| 仓库公开、活跃 | Submission Help | ✅ |
+| 根目录有 OSI 认可许可证 | Submission Help | ✅ MIT |
+| 根目录有 `ca_profile.xml`，**`<Profile>` 非空**（否则 CA 阻止提交完成） | Repository Information XML | ✅ 已补（`<Forum>` 待你填支持帖） |
+| 每个应用有 `<Repository>`（Docker） | Repository XML Format | ✅ |
+| 提交后跑 **Validate / Scan**，且每次有意义的 XML 改动后重跑 | Submission Help | ⚠️ 只能在你的 Unraid 上做 |
+
+模板里的 minimum/recommended 字段现在由 `scripts/check-template.mjs` 断言（Name / Repository / Category / Icon / Overview / Project / Support / TemplateURL 一个不空），validate 工作流与 release 资产生成都会跑它。
+
 ## 步骤
 
 ### 1. 先把镜像和模板验证一遍
@@ -18,7 +32,11 @@
   ssh unraid 'docker inspect dsh --format "{{index .Config.Labels \"net.unraid.docker.managed\"}}"'
   ```
 
-### 2. 在 CA 里跑 claim 流程
+### 2. 在 CA 里跑 claim 流程（Submit → Validate → Scan）
+
+官方的提交流程是 `ca.unraid.net` 的 **Submit** 工作区：填仓库地址 → **Validate**（解析 XML）→ **Scan**（重复应用与门槛检查）→ 预览 listing → 提交。**每次有意义的 XML 改动后都要重跑**，因为解析器会按最新模板重新生成 feed 条目。
+
+### 2b. 本地先跑一遍同样的检查
 
 在 Unraid 的 Community Applications 里找到"提交/认领模板仓库"的入口（CA 设置内的 submit/claim 页），填入本仓库地址，它会给出 `.unraid/community-apps-claim.json` 的内容。把它提交到本仓库根目录后，CA 即可收录。
 
