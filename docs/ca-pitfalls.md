@@ -15,6 +15,8 @@
 | A4 | 提交后要跑 **Validate / Scan**，且"每次有意义的 XML 改动后都要重跑" | 官方《Submission Help》 | ⚠️ 这一步只能在你的 Unraid 上做（见 [ca-submission.md](ca-submission.md)） |
 | A5 | **`:latest` 标签不存在会被拉黑**（实例：`ntop/ntopng is blacklisted with ":Latest tag does not exist"`） | 论坛 | ✅ 流水线**永远**同时推 `:latest` 与 `:<版本>`；不要改成只推版本号 |
 | A6 | **声明与实际不符会被下架**：Unspin 因 `PluginURL` 与 .plg 内声明不一致被 CA 移除，修好后**仍需 moderator 手工重新上架**，等了数天 | 论坛 | ⚠️ `<Repository>`/`<TemplateURL>`/`<Registry>`/`<Icon>` 一律指向稳定、真实、短期内不会迁移的位置；**镜像与仓库名一旦提交就不要改** |
+| A7 | **`Mask="true"` 的 `<Config>` 值不会传给容器**（2026-10-15 本机实测，Unraid 7.3.2）：模板里「访问口令」写 `Mask="true"` 且文本为 `12345678`，用 `update_container` 重建后容器**完全没有** `DSH_PASSWORD` 这个变量（门禁静默退化成随机口令）；同一模板仅把 `Mask` 改成 `false`，重建后变量立刻到位 | 本机实测（对照实验：唯一变量是 Mask） | ✅ 口令字段改为 `Mask="false"`，并在 `scripts/check-template.mjs` 里禁止任何 `Mask="true"`（负例已验证会被拦下） |
+| A8 | **`<Config>` 的元素文本才是生效值，`Default` 只是"新模板时的预填"**：实测一个 Port 字段 `Default="0.0.0.0:3082"` 但文本仍是 `0.0.0.0:8080`，用模板重建后容器**绑到了 8080** | 本机实测 | ✅ `scripts/check-template.mjs` 断言每个 Config 的文本与 `Default` 必须一致（负例已验证会被拦下）；仓库模板本身 10 个字段全部一致 |
 
 ## B. 上架之后才发现就晚了
 
