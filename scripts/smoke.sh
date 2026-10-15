@@ -21,6 +21,12 @@
 #   3. a cross-site POST is 403     — DSH's browser-trust fence is intact.
 #   4. the native "open document"   — Caddy still gates the endpoints that would
 #      endpoint is 403                otherwise hand the page filesystem actions.
+#  4b. the password gate works      — no credentials / wrong password / forged cookie
+#      all fail, the right password mints a cookie that carries the session (also for
+#      the WebSocket upgrade), and the shipped default announces itself.
+#  4h. the remote sign-in bridge    — /remote-login is served, gated, and its
+#      callback target is only live while a sign-in actually waits; REMOTE_SIGNIN=off
+#      leaves upstream behaviour alone.
 #   5. bwrap confines a shell       — the sandbox rung Unraid depends on exists.
 #   6. both Caddyfiles validate     — a config typo cannot ship.
 set -Eeuo pipefail
@@ -326,6 +332,89 @@ if grep --quiet 'dsh-auth-' "${AUTO_JAR}" 2>/dev/null; then
     pass 'the automatic heal stored a fresh session cookie'
 else
     fail 'the automatic heal did not store a fresh dsh-auth cookie'
+fi
+
+# 4h — the remote sign-in bridge (docs/remote-signin.md). Upstream refuses an account
+# sign-in unless the browser's own origin is a loopback address — measured against the
+# platform, `redirect_uri=https://<host>/...` answers 50005 while
+# `redirect_uri=http://127.0.0.1:<port>/...` answers code 0 — and no browser on the LAN
+# or on the internet can reach such an address. The image therefore claims one and
+# serves a page that carries the undelivered callback back to DSH's own route.
+#
+# Three things have to hold, and each has failed in some design: the overlay must load
+# (otherwise the sign-in still dies locally), the page must be served and gated like
+# every other surface, and the path it targets must be reachable *only* while an
+# attempt waits — a permanently live /oauth/callback would be a worse design than the
+# bug it fixes.
+BRIDGE_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-login" || true)"
+BRIDGE_BODY="$(curl --silent --max-time 5 "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-login" || true)"
+BRIDGE_TYPE="$(curl --silent --output /dev/null --write-out '%{content_type}' --max-time 5 \
+    "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-login" || true)"
+if [[ "${BRIDGE_CODE}" == "200" && "${BRIDGE_TYPE}" == text/html* ]] \
+    && grep --quiet -- '/oauth/callback' <<< "${BRIDGE_BODY}" \
+    && grep --quiet -- 'state' <<< "${BRIDGE_BODY}"; then
+    pass '/remote-login serves the remote sign-in bridge page'
+else
+    fail "/remote-login answered ${BRIDGE_CODE} (${BRIDGE_TYPE}) without the expected callback markup"
+fi
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    "http://127.0.0.1:${PORT}/remote-login" || true)" == "401" ]]; then
+    pass 'the bridge page is behind the same gate as the UI (401 without credentials)'
+else
+    fail 'the bridge page is reachable without authenticating'
+fi
+CALLBACK_IDLE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/oauth/callback?code=smoke-test&state=smoke-test" || true)"
+if [[ "${CALLBACK_IDLE}" == "404" ]]; then
+    pass 'the callback path is dead without a pending sign-in (the page alone completes nothing)'
+else
+    fail "no sign-in is pending, yet /oauth/callback answered ${CALLBACK_IDLE}, expected 404"
+fi
+OVERLAY_LINE=''
+for _ in $(seq 1 30); do
+    OVERLAY_LINE="$(docker logs "${NAME}" 2>&1 | grep '\[remote-signin\] active' | tail -1)"
+    [[ -n "${OVERLAY_LINE}" ]] && break
+    sleep 2
+done
+if [[ "${OVERLAY_LINE}" == *'loopback claim'* ]]; then
+    pass 'the remote sign-in overlay loaded and claimed its loopback origin'
+else
+    fail "the remote sign-in overlay never reported itself active (log said: ${OVERLAY_LINE:-nothing})"
+fi
+
+# 4i — REMOTE_SIGNIN=off is the documented escape hatch back to upstream behaviour, and
+# a value nobody implements must not be guessed at. Both are cheap to assert and both
+# are the kind of thing that silently drifts.
+OFF_NAME="${NAME}-rs-off"
+OFF_PORT=$((PORT + 4))
+mkdir -p "${WORKDIR}/data-rs-off" "${WORKDIR}/workspace-rs-off"
+docker run --detach --name "${OFF_NAME}" \
+    --env 'ALLOWED_CLIENTS=127.0.0.1,172.16.0.0/12' \
+    --env 'DSH_PASSWORD=smoke-test-password' \
+    --env 'REMOTE_SIGNIN=off' \
+    --publish "127.0.0.1:${OFF_PORT}:8080" \
+    --volume "${WORKDIR}/data-rs-off:/data" \
+    --volume "${WORKDIR}/workspace-rs-off:/workspace" \
+    "${IMAGE}" >/dev/null
+for _ in $(seq 1 30); do
+    if curl --silent --fail --max-time 3 "http://127.0.0.1:${OFF_PORT}/healthz" >/dev/null 2>&1; then break; fi
+    sleep 2
+done
+OFF_LOG="$(docker logs "${OFF_NAME}" 2>&1)"
+if grep --quiet 'remote sign-in: off' <<<"${OFF_LOG}" && ! grep --quiet '\[remote-signin\] active' <<<"${OFF_LOG}"; then
+    pass 'REMOTE_SIGNIN=off leaves the overlay unloaded'
+else
+    fail 'REMOTE_SIGNIN=off either kept the overlay or never said so in the log'
+fi
+docker rm -f "${OFF_NAME}" >/dev/null 2>&1 || true
+if docker run --rm \
+    --env 'DSH_PASSWORD=smoke-test-password' \
+    --env 'REMOTE_SIGNIN=sometimes' \
+    "${IMAGE}" >/dev/null 2>&1; then
+    fail 'an unsupported REMOTE_SIGNIN value was accepted'
+else
+    pass 'an unsupported REMOTE_SIGNIN value refuses to start the container'
 fi
 
 # 5 — bubblewrap
