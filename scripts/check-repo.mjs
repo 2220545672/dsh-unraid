@@ -74,7 +74,13 @@ try {
 } catch {
   notes.push('git ls-files unavailable; skipping the placeholder sweep over tracked files')
 }
-const sweep = tracked.filter((f) => /\.(md|xml|yml|yaml|json|mjs|sh|svg)$/.test(f) && !f.startsWith('templates/img/src/'))
+// This script defines the patterns, so sweeping it would always match itself.
+const sweep = tracked.filter(
+  (f) =>
+    /\.(md|xml|yml|yaml|json|mjs|sh|svg)$/.test(f) &&
+    !f.startsWith('templates/img/src/') &&
+    f !== 'scripts/check-repo.mjs',
+)
 for (const file of sweep) {
   const text = readFileSync(join(root, file), 'utf8')
   for (const [pattern, label] of placeholderPatterns) {
