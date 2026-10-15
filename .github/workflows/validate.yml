@@ -88,7 +88,7 @@ jobs:
       - name: Hadolint
         # The official action (rather than the container image, which exposes no
         # entrypoint and therefore ignored .hadolint.yaml when fed via stdin).
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: Dockerfile
           config: .hadolint.yaml
