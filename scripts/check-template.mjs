@@ -82,31 +82,27 @@ const configs = [...xml.matchAll(/<Config\s([^>]*)>([\s\S]*?)<\/Config>/g)].map(
   const attrs = Object.fromEntries([...match[1].matchAll(/(\w+)="([^"]*)"/g)].map((a) => [a[1], a[2]]))
   return { ...attrs, value: match[2].trim() }
 })
-// 2a — for every Config, the element text IS the value Unraid instantiates with
-// (Default is only the fallback shown for a fresh template). When they disagree the
-// field displays one value and creates the container with another: a demo built from
-// a template whose Port Default said 0.0.0.0:3082 but whose text still said
-// 0.0.0.0:8080 came up on 8080.
+// 2 — how Unraid 7.3.2 resolves a Config, measured twice on this host:
+//   * a non-empty element text is what the container gets (a Port whose text still
+//     said 0.0.0.0:8080 while Default said 0.0.0.0:3082 bound 8080);
+//   * an empty element text falls back to Default (a cleared 访问口令 with
+//     Default="12345678" still reached the container as 12345678).
+// So an empty text is a legitimate way to ship a default, but a text that disagrees
+// with Default is a trap: the file advertises one value and the container gets another.
 for (const cfg of configs) {
   const text = cfg.value ?? ''
   const fallback = cfg.Default ?? ''
-  if (text !== fallback) {
+  if (text !== '' && text !== fallback) {
     errors.push(
       `<Config Name="${cfg.Name}">: element text ${JSON.stringify(text)} and Default ${JSON.stringify(fallback)} disagree; Unraid uses the text, so the field would show one value and create the container with another`,
     )
   }
 }
-// 2b — a masked Variable never reaches the container. Measured on Unraid 7.3.2: with
-// Mask="true" on DSH_PASSWORD the recreated container had no DSH_PASSWORD at all (the
-// gate silently fell back to a generated password), while Mask="false" passed it
-// through. This image takes every setting from the environment, so masking a field
-// would quietly drop it — the template must not mask anything.
-const masked = configs.filter((cfg) => cfg.Mask === 'true')
-if (masked.length > 0) {
-  errors.push(
-    `masked Config ${masked.map((c) => c.Name).join(', ')}: Unraid does not pass masked values to the container, so the setting would silently not apply`,
-  )
-}
+// Mask only hides the value in the GUI form — the value is still stored in the
+// template and still reaches the container (verified with Mask="true" and a value of
+// my-own-secret-99, which arrived as DSH_PASSWORD). No assertion here, then: masking is
+// a display choice. This note exists because an earlier version of this file banned it
+// after a faulty check (a printf-truncated comparison) reported the variable missing.
 
 const volumes = [...xml.matchAll(/<Volume>([\s\S]*?)<\/Volume>/g)].map((match) => ({
   host: (/<HostDir>([\s\S]*?)<\/HostDir>/.exec(match[1]) ?? [, ''])[1].trim(),

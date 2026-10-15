@@ -107,7 +107,7 @@ docker run -d --name dsh --restart unless-stopped \
 容器自带口令门禁，且**默认开启**——因为默认安装不应该让"能连到这个端口的人"都能用：这个应用会在挂载的工作目录里执行命令，并把你的模型凭据放在 `/data`。
 
 * **第一件事：改掉默认口令。** Unraid 模板自带 `12345678`，目的是让刚装好的容器立刻能登录。但这个值是公开的：**在改掉之前，任何能访问该端口、且知道这个默认值的人都能操作你的智能体**（在挂载的工作目录里执行命令、读取 `/data` 里的凭据）。请在容器设置里修改「访问口令」/ `DSH_PASSWORD`；只要还在用默认值，容器每次启动都会打一条安全告警。
-* **设置口令**：填 `DSH_PASSWORD`（或用 `DSH_PASSWORD_FILE` 指向文件）。**留空**（而不是沿用默认值）则容器首次启动时随机生成一个并**只在日志里打印一次**——`docker logs <容器名>`，或 Docker 页 → 该容器 → Logs。用户名是 `dsh`。
+* **登录 = 用户名 + 口令。** 用户名默认 `dsh`，它是独立的一个模板字段（「访问用户名」/ `AUTH_USER`），必须匹配 `[A-Za-z0-9][A-Za-z0-9._-]*`，否则容器拒绝启动。口令来自 `DSH_PASSWORD`（或用 `DSH_PASSWORD_FILE` 指向文件）；把模板字段清空会回退到它的 `Default`（`12345678`），想用随机口令则用 CLI 显式传空 `-e DSH_PASSWORD=`（首启生成一个并**只在日志里打印一次**——`docker logs <容器名>`，或 Docker 页 → 该容器 → Logs）。
 * **原理**：口令只通过浏览器自带的登录框校验一次（HTTP basic auth）；校验通过后发放一个 Cookie，其值是"口令 + 每套安装独立盐值"的 HMAC。此后普通请求**和客户端的 WebSocket 握手**都靠这个 Cookie 通行——浏览器不保证在 WebSocket 升级时携带缓存的 HTTP 凭据，这就是门禁不做成"每个请求都 basic"的原因。`/healthz` 保持免认证，容器健康检查不受影响。改口令（或删除 `/data/caddy/data/auth-gate-salt`）会让已签发的 Cookie 全部失效。
 * **口令走明文 HTTP 在公网并不安全**：门禁保护的是应用，不是链路。要暴露到局域网之外，必须在前面用反向代理终结 TLS；配合设置 `PUBLIC_URL`，容器就只应答那一个 authority。
 * **已经有 SSO？** 把 `AUTH_MODE` 设为 `none`，交给代理认证（SWAG + Authelia、Authentik……），`ALLOWED_CLIENTS` 仍作为第二层生效。其它 `AUTH_MODE` 取值一律 fail-closed。

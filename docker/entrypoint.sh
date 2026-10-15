@@ -41,6 +41,8 @@ DSH_INTERNAL_PORT="${DSH_INTERNAL_PORT:-3080}"
 # AUTH_MODE unset means "whatever this image considers safe": a password gate,
 # because a default install must not be usable by everybody who can reach the port.
 AUTH_MODE="${AUTH_MODE:-builtin}"
+# The template ships this as a required field (default dsh): a login prompt that asks
+# for a user name the operator cannot find anywhere in the UI is a bad first run.
 AUTH_USER="${AUTH_USER:-dsh}"
 AUTH_COOKIE_NAME="${AUTH_COOKIE_NAME:-dsh_gate}"
 AUTH_COOKIE_MAX_AGE="${AUTH_COOKIE_MAX_AGE:-604800}"
@@ -290,6 +292,10 @@ if [[ "${AUTH_MODE}" == "builtin" ]]; then
     fi
     (( ${#password} >= 8 )) || fatal "the password must be at least 8 characters (got ${#password}); set DSH_PASSWORD or DSH_PASSWORD_FILE"
     [[ ! "${password}" =~ [[:space:]] ]] || fatal "the password must not contain whitespace"
+# The user name ends up as a token in the Caddyfile (user hash) and is shown in the
+# browser's login prompt, so keep it to something that cannot break the directive.
+[[ "${AUTH_USER}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
+    || fatal "AUTH_USER (the gate's user name) must match [A-Za-z0-9][A-Za-z0-9._-]* — got '${AUTH_USER}'"
 
     salt_file="${CADDY_DATA_HOME}/auth-gate-salt"
     if [[ ! -s "${salt_file}" ]]; then
@@ -331,7 +337,8 @@ if [[ "${AUTH_MODE}" == "builtin" ]]; then
         log "authentication: built-in password gate, user '${AUTH_USER}' (password from ${password_source})"
     fi
     if [[ "${password}" == "${DEFAULT_TEMPLATE_PASSWORD}" ]]; then
-        warn "SECURITY: the password is still the template default '${DEFAULT_TEMPLATE_PASSWORD}', which is public. Anybody who can reach this port and knows it can drive the agent: run commands in ${DSH_WORKSPACE}, read the credentials in ${DSH_HOME}. Change 访问口令 / DSH_PASSWORD in the container settings now."
+        warn "SECURITY: 口令仍是默认值 '${DEFAULT_TEMPLATE_PASSWORD}'（公开值）。任何能访问本端口的人都能操作你的智能体：在 ${DSH_WORKSPACE} 里执行命令、读取 ${DSH_HOME} 里的凭据。请在容器设置里改「访问口令」/ DSH_PASSWORD（用户名是 '${AUTH_USER}'）。"
+        warn "SECURITY: the password is still the default '${DEFAULT_TEMPLATE_PASSWORD}', which is public. Anybody who can reach this port can drive the agent: run commands in ${DSH_WORKSPACE}, read the credentials in ${DSH_HOME}. Change 访问口令 / DSH_PASSWORD in the container settings (user name: '${AUTH_USER}')."
     fi
     [[ -z "${PUBLIC_URL}" ]] || warn "AUTH_MODE=builtin with PUBLIC_URL set: if the proxy in front already authenticates, set AUTH_MODE=none to avoid a second login"
     unset password password_hash

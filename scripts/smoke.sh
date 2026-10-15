@@ -202,10 +202,17 @@ for _ in $(seq 1 30); do
     if curl --silent --fail --max-time 3 "http://127.0.0.1:${DEFAULT_PORT}/healthz" >/dev/null 2>&1; then break; fi
     sleep 2
 done
-if docker logs "${DEFAULT_NAME}" 2>&1 | grep --quiet 'still the template default'; then
-    pass 'the shipped default password announces itself in the log'
+DEFAULT_LOG="$(docker logs "${DEFAULT_NAME}" 2>&1)"
+if grep --quiet 'SECURITY: 口令仍是默认值' <<<"${DEFAULT_LOG}" \
+    && grep --quiet 'SECURITY: the password is still the default' <<<"${DEFAULT_LOG}"; then
+    pass 'the default password is announced in both Chinese and English'
 else
-    fail 'a container using the shipped default password did not warn about it'
+    fail 'the default password warning is missing one of its two lines (Chinese/English)'
+fi
+if grep --quiet "用户名是 'dsh'" <<<"${DEFAULT_LOG}"; then
+    pass 'the warning also names the account to sign in with'
+else
+    fail 'the warning does not say which user name to use'
 fi
 if docker logs "${DEFAULT_NAME}" 2>&1 | grep --quiet '(auth=builtin)'; then
     pass 'the default AUTH_MODE is builtin (the gate is on out of the box)'
@@ -213,6 +220,44 @@ else
     fail 'the image did not start with auth=builtin by default'
 fi
 docker rm -f "${DEFAULT_NAME}" >/dev/null 2>&1 || true
+
+# 4d — the user name is a setting (the template ships it as a required field). A login
+# prompt that asks for a name nobody can find is the failure this guards against.
+USER_NAME="${NAME}-username"
+USER_PORT=$((PORT + 3))
+docker run --detach --name "${USER_NAME}" \
+    --env 'ALLOWED_CLIENTS=127.0.0.1,172.16.0.0/12' \
+    --env 'DSH_PASSWORD=smoke-test-password' \
+    --env 'AUTH_USER=operator' \
+    --publish "127.0.0.1:${USER_PORT}:8080" \
+    --volume "${WORKDIR}/data-user:/data" \
+    --volume "${WORKDIR}/workspace-user:/workspace" \
+    "${IMAGE}" >/dev/null
+for _ in $(seq 1 30); do
+    if curl --silent --fail --max-time 3 "http://127.0.0.1:${USER_PORT}/healthz" >/dev/null 2>&1; then break; fi
+    sleep 2
+done
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 --user 'operator:smoke-test-password' "http://127.0.0.1:${USER_PORT}/")" == '303' ]]; then
+    pass 'the configured user name signs in (AUTH_USER)'
+else
+    fail 'AUTH_USER was ignored: the configured user name could not sign in'
+fi
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 --user 'dsh:smoke-test-password' "http://127.0.0.1:${USER_PORT}/")" == '401' ]]; then
+    pass 'the default user name stops working once AUTH_USER names another one'
+else
+    fail 'both the default and the configured user name were accepted'
+fi
+docker rm -f "${USER_NAME}" >/dev/null 2>&1 || true
+
+# 4e — a user name that would break the Caddyfile directive must be refused outright
+if docker run --rm \
+    --env 'DSH_PASSWORD=smoke-test-password' \
+    --env 'AUTH_USER=bad user' \
+    "${IMAGE}" >/dev/null 2>&1; then
+    fail 'a user name with a space was accepted'
+else
+    pass 'an invalid AUTH_USER refuses to start the container'
+fi
 
 # 5 — bubblewrap
 if docker exec "${NAME}" bwrap --version >/dev/null 2>&1; then
