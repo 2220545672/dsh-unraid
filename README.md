@@ -43,6 +43,24 @@ docker run -d --name dsh --restart unless-stopped -p 8080:8080 \
 3. **Add a DeepSeek API key** — *Add API key* in the same panel. Signing in with a DeepSeek **account** only works from a loopback browser; see [Problems](#problems).
 4. **Point it at your project.** The agent works in `/workspace` (default `appdata/dsh/workspace`).
 
+## How it is put together
+
+One container, two processes, one port:
+
+```text
+browser ──▶ :8080  Caddy (bundled)  ──▶ 127.0.0.1:3080  DSH
+                     ├─ optional password gate (on by default)
+                     ├─ allowlist: ALLOWED_CLIENTS
+                     ├─ security headers, host/origin checks
+                     └─ /healthz for the container healthcheck
+```
+
+- **The reverse proxy is already in the image.** Caddy serves the port you publish and forwards to DSH, which listens on loopback only — so the published port is the single way in, and the proxy is the layer that adds the security headers, refuses cross-site calls and blocks the endpoints that make no sense remotely. There is nothing extra to install or configure.
+- **Authentication is optional, and it is one switch.** `AUTH_MODE=builtin` (the default) asks for a password once through the browser's ordinary login prompt, then keeps you signed in with a cookie that also covers the WebSocket; `AUTH_MODE=none` hands that job to whatever sits in front (SWAG + Authelia, a VPN, a trusted LAN). Any other value refuses to start instead of booting unprotected — and never stack two logins. The container's own healthcheck stays open either way.
+- **The allowlist lives at the same layer.** `ALLOWED_CLIENTS` decides who may reach the container at all; loopback is always allowed, which is what keeps the healthcheck working.
+- **It runs unprivileged.** uid 1000, no docker socket, no host directories beyond the two volumes you map. Credentials are stored in `/data` — the reason that volume must be persistent.
+- **A password over plain HTTP is not safe on the internet.** The gate protects the app, not the wire: terminate TLS in whatever you put in front before exposing this.
+
 ## Update
 
 Unraid: **Docker → your container → force update** (or click the "apply update" hint). Everything in `/data` and `/workspace` survives.
