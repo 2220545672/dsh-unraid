@@ -214,10 +214,19 @@ if grep --quiet "用户名是 'dsh'" <<<"${DEFAULT_LOG}"; then
 else
     fail 'the warning does not say which user name to use'
 fi
-if docker logs "${DEFAULT_NAME}" 2>&1 | grep --quiet '(auth=builtin)'; then
+# "starting Caddy ... (auth=...)" is the last line the entrypoint prints, so a slow
+# runner can still be missing it while /healthz already answers — which is exactly how
+# this assertion failed once in CI and passed locally. Poll the log instead of racing it.
+AUTH_MODE_LINE=''
+for _ in $(seq 1 30); do
+    AUTH_MODE_LINE="$(docker logs "${DEFAULT_NAME}" 2>&1 | grep '(auth=' | tail -1)"
+    [[ -n "${AUTH_MODE_LINE}" ]] && break
+    sleep 2
+done
+if [[ "${AUTH_MODE_LINE}" == *'(auth=builtin)'* ]]; then
     pass 'the default AUTH_MODE is builtin (the gate is on out of the box)'
 else
-    fail 'the image did not start with auth=builtin by default'
+    fail "the image did not start with auth=builtin by default (log said: ${AUTH_MODE_LINE:-nothing yet})"
 fi
 docker rm -f "${DEFAULT_NAME}" >/dev/null 2>&1 || true
 
