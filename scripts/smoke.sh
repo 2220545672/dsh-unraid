@@ -133,6 +133,30 @@ else
     fi
 fi
 
+# 5b — the tool surface the deployment needs, and a writable HOME.
+#
+# Learnt the hard way: an image that simply omitted openssh-client could not reach
+# its host at all (and git-over-ssh remotes stopped authenticating), while pnpm and
+# unzip had also gone missing from a build that otherwise looked fine. HOME is the
+# second half of the same story — left at /root while the entrypoint drops to
+# uid 1000, every ~-based path (ssh config, git config, tool caches) fails with a
+# permission error that looks like anything but a HOME problem.
+TOOL_MISSING=""
+for tool in ssh git curl jq rg unzip less pnpm node bwrap setpriv; do
+    docker exec "${NAME}" sh -c "command -v ${tool} >/dev/null 2>&1" || TOOL_MISSING="${TOOL_MISSING} ${tool}"
+done
+if [[ -z "${TOOL_MISSING}" ]]; then
+    pass 'the image ships the expected tools (ssh, git, curl, jq, rg, unzip, less, pnpm, node, bwrap)'
+else
+    fail "the image is missing tools this deployment needs:${TOOL_MISSING}"
+fi
+CONTAINER_HOME="$(docker exec --user 1000:1000 "${NAME}" sh -c 'printf %s "${HOME:-unset}"' 2>/dev/null)"
+if docker exec --user 1000:1000 "${NAME}" sh -c 'test -w "${HOME:-/nonexistent}"' 2>/dev/null; then
+    pass "HOME (${CONTAINER_HOME}) is writable by the account the container runs as"
+else
+    fail "HOME (${CONTAINER_HOME}) is not writable by the account the container runs as; ~/.ssh and tool caches will fail"
+fi
+
 # 6 — both Caddy configs must validate
 for config in edge lan; do
     if docker exec \
