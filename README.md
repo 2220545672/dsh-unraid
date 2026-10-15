@@ -120,6 +120,7 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 | 改模板 | 编辑 `templates/dsh.xml`；`__GHCR_OWNER__` / `__REPO__` / `__IMAGE_TAG__` 由 `scripts/render-template.mjs` 渲染 |
 | **首次发布** | 见 [docs/publish.md](docs/publish.md)：建仓库 → 推送 → 两个仓库设置（Workflow permissions 必须为 read/write、首发后把 GHCR 包设为 public）→ 手动触发一次 release |
 | 提交到 CA | 见 [docs/ca-submission.md](docs/ca-submission.md)（老仓库已停止收新模板，现在走仓库 claim） |
+| 迁移现有部署 | 见 [docs/migrate-from-dsh-web.md](docs/migrate-from-dsh-web.md)：从 `dsh-web`(okxlin 镜像) 切到本镜像，含"容器名变了要让 SWAG 跟着改"与最小中断步骤 |
 
 ## English summary
 
