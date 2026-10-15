@@ -113,7 +113,9 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/resolve-dsh-version.mjs --json
+          node scripts/check-template.mjs templates/dsh.xml
           node scripts/render-template.mjs --owner=example --out=/tmp/dsh.xml
+          node scripts/check-template.mjs /tmp/dsh.xml
           python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('/tmp/dsh.xml'); print('rendered template is well-formed XML')"
           # The composed icon is committed; scripts/make-icon.mjs needs sharp, which CI
           # deliberately does not install, so only its PNG header is verified here.

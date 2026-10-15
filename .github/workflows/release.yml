@@ -196,6 +196,7 @@ jobs:
             --tag='${{ needs.resolve.outputs.version }}' \
             --version='${{ needs.resolve.outputs.version }}' \
             --out='dist/dsh.xml'
+          node scripts/check-template.mjs dist/dsh.xml
 
       - name: Create the GitHub release
         env:
