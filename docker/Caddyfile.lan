@@ -17,6 +17,24 @@
 	# TRUSTED_PROXIES — replaced by the entrypoint when TRUSTED_PROXY_CIDRS is set
 }
 
+# The header list DSH is given, shared by every proxy block so it exists once. Host is
+# loopback (what DSH's fence accepts in lan mode), and every identity header a proxy may
+# have added is stripped so nothing downstream can believe it is already authenticated.
+(dsh_upstream_headers) {
+	header_up Host {$DSH_UPSTREAM_HOST}
+	header_up -Origin
+	header_up -Authorization
+	header_up -Remote-User
+	header_up -X-Auth-User
+	header_up -X-Authenticated-User
+	header_up -X-Email
+	header_up -X-Forwarded-User
+	header_up -X-Roles
+	header_up -X-Remote-User
+	header_up -X-User
+	header_up -X-Webauth-User
+}
+
 :{$PORT} {
 	# ACCESS_CONTROL — replaced by the entrypoint from ALLOWED_CLIENTS
 	header {
@@ -69,21 +87,37 @@
 		respond "Forbidden" 403
 	}
 
+	# A stale session cookie looks exactly like a valid one from out here, so let DSH
+	# decide: when it answers 401 for the document, send the browser through /renew
+	# (which replays the launch token) rather than showing the dead end it prints. The
+	# marker cookie keeps that to one attempt, so a session that still cannot be
+	# established shows DSH's own 401 instead of bouncing forever. The bootstrap below
+	# cannot cover this case: it deliberately fires only when no dsh-auth-* cookie is
+	# present at all, which is exactly the condition this route requires — the two are
+	# mutually exclusive, so neither can shadow the other.
+	@stale_session {
+		method GET
+		path /
+		not query token=*
+		header Cookie *dsh-auth-*
+		not header Cookie *dsh_renew=1*
+	}
+
+	route @stale_session {
+		reverse_proxy 127.0.0.1:{$DSH_INTERNAL_PORT} {
+			import dsh_upstream_headers
+			@unauthorized status 401
+			handle_response @unauthorized {
+				header Set-Cookie "dsh_renew=1; Path=/; HttpOnly; SameSite=Lax; Max-Age=30"
+				redir * /renew 302
+			}
+		}
+	}
+
 	route {
 		rewrite @dsh_bootstrap /?token={$DSH_LAUNCH_TOKEN}
 		reverse_proxy 127.0.0.1:{$DSH_INTERNAL_PORT} {
-			header_up Host {$DSH_UPSTREAM_HOST}
-			header_up -Origin
-			header_up -Authorization
-			header_up -Remote-User
-			header_up -X-Auth-User
-			header_up -X-Authenticated-User
-			header_up -X-Email
-			header_up -X-Forwarded-User
-			header_up -X-Roles
-			header_up -X-Remote-User
-			header_up -X-User
-			header_up -X-Webauth-User
+			import dsh_upstream_headers
 		}
 	}
 }

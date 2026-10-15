@@ -264,12 +264,19 @@ fi
 # of the way (it only fires when no dsh-auth-* cookie is present at all), so without
 # this route the only cure is clearing cookies by hand.
 STALE_COOKIE='dsh-auth-loopback=stale-value-from-another-instance'
-CODE_STALE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+STALE_HEADERS="$(curl --silent --dump-header - --output /dev/null --max-time 5 \
     "${SMOKE_AUTH[@]}" --cookie "${STALE_COOKIE}" "http://127.0.0.1:${PORT}/")"
-if [[ "${CODE_STALE}" == '401' ]]; then
-    pass 'a stale dsh-auth cookie reproduces the 401 the app shows as "authentication required"'
+CODE_STALE="$(printf '%s' "${STALE_HEADERS}" | head -1 | awk '{print $2}')"
+STALE_LOCATION="$(printf '%s' "${STALE_HEADERS}" | grep --ignore-case '^location:' | tr -d '\r' | awk '{print $2}')"
+if [[ "${CODE_STALE}" == '302' && "${STALE_LOCATION}" == '/renew' ]]; then
+    pass 'a stale session cookie is redirected to /renew instead of dead-ending on 401'
 else
-    fail "a stale dsh-auth cookie answered ${CODE_STALE}, expected 401 (which is the failure mode /renew exists for)"
+    fail "a stale dsh-auth cookie answered ${CODE_STALE:-?} -> ${STALE_LOCATION:-nowhere}, expected 302 -> /renew"
+fi
+if printf '%s' "${STALE_HEADERS}" | grep --ignore-case --quiet '^set-cookie: dsh_renew=1'; then
+    pass 'the heal marks itself, so it cannot bounce forever'
+else
+    fail 'the healing redirect did not set its one-shot marker cookie'
 fi
 RENEW_LOCATION="$(curl --silent --dump-header - --output /dev/null --max-time 5 \
     "${SMOKE_AUTH[@]}" --cookie "${STALE_COOKIE}" "http://127.0.0.1:${PORT}/renew" \
@@ -293,6 +300,23 @@ if [[ "${CODE_RESCUED}" != '401' ]]; then
     pass "the rescued session reaches the app (HTTP ${CODE_RESCUED})"
 else
     fail 'the rescued session still answers 401'
+fi
+
+# 4g — the heal must happen without the operator doing anything: a stale cookie on a
+# document request is answered with 401 by DSH, which the route above turns into a
+# detour through /renew. Following redirects the way a browser does must land on the app.
+AUTO_JAR="${WORKDIR}/auto-cookies.txt"
+AUTO_CODE="$(curl --silent --location --output /dev/null --write-out '%{http_code}' --max-time 20 \
+    "${SMOKE_AUTH[@]}" --cookie "${STALE_COOKIE}" --cookie-jar "${AUTO_JAR}" "http://127.0.0.1:${PORT}/")"
+if [[ "${AUTO_CODE}" == '200' ]]; then
+    pass 'a stale cookie heals itself (no manual /renew, final HTTP 200)'
+else
+    fail "the automatic heal ended on HTTP ${AUTO_CODE}, expected 200"
+fi
+if grep --quiet 'dsh-auth-' "${AUTO_JAR}" 2>/dev/null; then
+    pass 'the automatic heal stored a fresh session cookie'
+else
+    fail 'the automatic heal did not store a fresh dsh-auth cookie'
 fi
 
 # 5 — bubblewrap
