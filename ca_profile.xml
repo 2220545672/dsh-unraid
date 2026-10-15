@@ -3,14 +3,7 @@
   Repository profile for Community Applications.
 
   Required by the CA submission gate: the file must be named exactly
-  ca_profile.xml, live in the repository root, and carry a non-empty <Profile>
-  (see ca.unraid.net Submit → Docs → Repository Information XML).
-
-  The <Forum> line is commented out on purpose: a support thread must exist
-  before it is filled in, and the CA docs ask for the real destination only.
--->
-<CommunityApplications>
-  <Profile>DSH（DeepSeek Harness）的 Unraid 打包与容器模板：多架构镜像（amd64/arm64）、跟随上游 npm 发版自动重建、并为没有 Landlock 的 Unraid 内核内置 bubblewrap 沙箱与相应的启动参数。仓库里同时有中英文安装文档、沙箱原理与迁移指南。| Unraid packaging and the container template for DSH (DeepSeek Harness): a multi-arch image rebuilt automatically from the newest upstream release, shipping a bubblewrap sandbox for kernels without Landlock, with documentation in Chinese and English.</Profile>
+  ca_profile.xml, live in the repository root, and carry a non-empty <Profile>本仓库维护 DSH（DeepSeek Harness）在 Unraid 上的容器模板与镜像：多架构（amd64 / arm64），随上游发版自动重建，内置 bubblewrap 以适配没有 Landlock 的 Unraid 内核，并提供中英文安装文档、沙箱原理说明与从其它镜像迁移的步骤。 | This repository maintains the Unraid container template and image for DSH (DeepSeek Harness): multi-arch (amd64 / arm64), rebuilt automatically for each upstream release, with bubblewrap bundled for Unraid kernels that lack Landlock. It carries installation documentation in Chinese and English, the sandbox rationale, and a migration guide.</Profile>
   <Icon>https://gh-proxy.com/https://raw.githubusercontent.com/2220545672/dsh-unraid/main/icon.svg</Icon>
   <WebPage>https://github.com/2220545672/dsh-unraid</WebPage>
   <!-- <Forum>https://forums.unraid.net/topic/REPLACE_WITH_SUPPORT_THREAD_ID/</Forum> -->

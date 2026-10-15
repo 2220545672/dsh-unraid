@@ -4,7 +4,7 @@
 
 | 文件 | 来源 | 许可 / 说明 |
 |---|---|---|
-| `dsh-mark.svg` | `deepseek-ai/deepseek-harness` 仓库的 `website/public/favicon.svg` | DeepSeek Harness 项目素材（上游仓库 MIT）。蓝色鲸鱼即 DSH 的标记 |
+| `dsh-mark.svg` | DeepSeek Harness 官方品牌素材（维护者提供的 logo SVG，`viewBox="0 0 23.16 17.04"`） | 原文件用 `currentColor`，本仓库固定为品牌蓝 **#4D6BFE**；这是横向的正式标记 |
 | `unraid-mark.svg` | `unraid/docs` 仓库的 `static/img/un-mark-gradient.svg` | Unraid 官方品牌素材（橙色条状 "U" 标） |
 
 ## 商标与非官方声明
