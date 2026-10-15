@@ -101,7 +101,9 @@ as_app_user() {
 shutdown_children() {
     local pid
     for pid in "${CADDY_PID}" "${DSH_PID}"; do
-        [[ -n "${pid}" ]] && kill -TERM "${pid}" 2>/dev/null || true
+        if [[ -n "${pid}" ]]; then
+            kill -TERM "${pid}" 2>/dev/null || true
+        fi
     done
     rm -f "${DSH_STARTUP_LOG}" 2>/dev/null || true
 }
@@ -198,7 +200,7 @@ DSH_PID=$!
 
 wait_for_dsh() {
     local attempt status
-    for attempt in $(seq 1 60); do
+    for _ in $(seq 1 60); do
         if ! kill -0 "${DSH_PID}" 2>/dev/null; then
             wait "${DSH_PID}" || true
             fatal "DeepSeek Harness exited before it became ready; see the log above"
@@ -213,7 +215,7 @@ wait_for_dsh() {
 
 resolve_launch_token() {
     local attempt line
-    for attempt in $(seq 1 60); do
+    for _ in $(seq 1 60); do
         while IFS= read -r line; do
             if [[ "${line}" =~ ^dsh\ web:\ http://127\.0\.0\.1:${DSH_INTERNAL_PORT}/\?token=([A-Za-z0-9_-]{20,256})$ ]]; then
                 DSH_LAUNCH_TOKEN="${BASH_REMATCH[1]}"
