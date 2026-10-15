@@ -234,6 +234,19 @@ prepare_directory "${DSH_WORKSPACE}"
 prepare_directory "${CADDY_CONFIG_HOME}"
 prepare_directory "${CADDY_DATA_HOME}"
 
+# HOME must be readable and writable by the account we drop to. The base image
+# leaves it at /root, which uid 1000 cannot even list, and DSH surfaces that as a
+# bewildering failure deep inside the UI ("cannot list /root: EACCES") when a file
+# or workspace picker opens. The image sets HOME correctly; this repairs the case
+# anyway, because an unwritable HOME stays silent until something opens a picker,
+# and a forked or re-based build should not have to rediscover it.
+if [[ ! -d "${HOME}" || ! -w "${HOME}" ]]; then
+    fallback_home="/home/node"
+    warn "HOME='${HOME}' is not writable by uid ${APP_UID}; using ${fallback_home} instead"
+    install -d -o "${APP_UID}" -g "${APP_GID}" -m 0755 "${fallback_home}"
+    export HOME="${fallback_home}"
+fi
+
 if ! awk '$5 == "/data" { found = 1 } END { exit found ? 0 : 1 }' /proc/self/mountinfo; then
     warn "/data is not a mount point: sessions, credentials and the agent home will be lost when this container is recreated"
 fi
