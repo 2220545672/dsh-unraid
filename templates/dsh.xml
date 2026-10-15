@@ -42,6 +42,8 @@
 
 模型凭据在应用界面里配置，本模板不要求填写任何密钥。
 
+**用 DeepSeek 账号登录（而非 API Key）**：登录标签页最后会停在一个打不开的 `127.0.0.1` 页面上——这是上游的限制（平台只允许登录结果回到回环地址）。把那个页面的地址复制出来，粘到 `/remote-login`（例如 https://dsh.example.com/remote-login）即可完成登录；把本模板的 **Remote sign-in** 设为 off 可回到上游「只有回环地址下的浏览器能登录」的行为。仓库文档：docs/remote-signin.md。
+
 **页面提示 “dsh web authentication required”**：通常**自动**恢复（DSH 对文档请求回 401 时会被自动引到 `/renew` 重放启动 token，只绕一次、不会成环）；也可手动打开 `http://&lt;你的地址&gt;:&lt;端口&gt;/renew`，或清掉该站点的 Cookie。
 **排障**
 - docker logs &lt;容器名&gt; | head -30 ：启动日志会写明运行模式（edge / lan）、上游版本与启动结果。
@@ -68,6 +70,8 @@ DSH (DeepSeek Harness) is an open-source coding agent whose interface is a brows
 
 Model credentials are configured inside the app; this template never asks for a key.
 
+**Signing in with a DeepSeek account (rather than an API key)**: the login tab ends on a dead `127.0.0.1` page — that is upstream's restriction (the platform only returns a login to a loopback address). Copy that page's address and paste it at `/remote-login` (for example https://dsh.example.com/remote-login) to finish; set **Remote sign-in** to off for upstream's loopback-only behaviour. Repository documentation: docs/remote-signin.md.
+
 **Page says “dsh web authentication required”**: it now recovers **automatically** (a 401 on the document is redirected through `/renew`, once, without looping); you can also open `http://&lt;your-address&gt;:&lt;port&gt;/renew` yourself or clear that site's cookies.
 **Troubleshooting**
 - docker logs &lt;container&gt; | head -30 — the entrypoint prints the mode (edge / lan), the upstream version and the startup result.
@@ -84,5 +88,6 @@ Upstream project: https://github.com/deepseek-ai/deepseek-harness · Documentati
   <Config Name="Trusted Proxy CIDRs (optional)" Target="TRUSTED_PROXY_CIDRS" Default="" Mode="" Description="仅当容器前面有反向代理时填写：Caddy 只对这些来源读取 X-Forwarded-For，从而按**真实客户端 IP** 匹配 **Allowed Clients**。切勿填写不可信客户端也能发起的网段——那样任何人都能伪造来源绕过白名单。| Only when a reverse proxy fronts this container: Caddy then reads X-Forwarded-For from these peers only, so the allowlist sees the real client address. Never list a range untrusted clients can originate from; they could forge the header and bypass the allowlist." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
   <Config Name="Public URL" Target="PUBLIC_URL" Default="" Mode="" Description="对外访问地址的完整 origin，例如 https://dsh.example.com（不要带路径）。设置后会启用严格模式：DSH 只接受该 authority 的请求，并拒绝其它 Origin。留空 = 局域网模式：仅剥掉 Origin 并把 Host 固定为 loopback，适合受信内网或 VPN。Full origin when a reverse proxy fronts this container; leave empty for a trusted LAN." Type="Variable" Display="always" Required="false" Mask="false"></Config>
   <Config Name="Trusted Hosts (DSH_TRUSTED_HOSTS)" Target="DSH_TRUSTED_HOSTS" Default="" Mode="" Description="额外的可信 authority，逗号分隔（如 dsh.example.com,192.168.1.10:8080）。仅在设置了 PUBLIC_URL 时生效。Extra accepted host[:port] authorities, comma separated; only used together with PUBLIC_URL." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Remote Sign-in (default: on)" Target="REMOTE_SIGNIN" Default="on" Mode="" Description="用 DeepSeek **账号**（而不是 API Key）登录时：on（默认）会加载本镜像的登录桥，让局域网 / Tailscale / 反向代理后面的浏览器也能把登录走完——登录标签页最后停在打不开的 127.0.0.1 页面上，把该地址粘到 /remote-login 即完成；off = 上游行为（只有回环地址下的浏览器能用账号登录）。填其它值容器拒绝启动。| DeepSeek **account** sign-in (as opposed to an API key): on (default) loads this image's sign-in bridge so a browser on the LAN, Tailscale or behind a proxy can finish the login — the login tab ends on a dead 127.0.0.1 page and /remote-login completes it; off = upstream behaviour (only a loopback browser can sign in with an account). Any other value refuses to start." Type="Variable" Display="advanced" Required="false" Mask="false">on</Config>
   <Config Name="Time Zone" Target="TZ" Default="Asia/Shanghai" Mode="" Description="容器时区。Container time zone." Type="Variable" Display="advanced" Required="false" Mask="false">Asia/Shanghai</Config>
 </Container>

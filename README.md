@@ -42,7 +42,7 @@ docker run -d --name dsh --restart unless-stopped -p 8080:8080 \
 
 1. **Open the UI.** The first visit signs you in — there is no token to copy out of the logs.
 2. **Change the password.** The template ships `12345678`, which is public knowledge. It is the **Password** field (`DSH_PASSWORD`). (Cleared, the container generates one and prints it once: `docker logs <container>`.) User name defaults to `dsh`.
-3. **Add a DeepSeek API key** — *Add API key* in the same panel. Signing in with a DeepSeek **account** only works from a loopback browser; see [Problems](#problems).
+3. **Add a DeepSeek API key** — *Add API key* in the same panel. A DeepSeek **account** also works from any browser: the login tab ends on a dead `127.0.0.1` page, and `/remote-login` finishes it — see [docs/remote-signin.md](docs/remote-signin.md).
 4. **Point it at your project.** The agent works in `/workspace` (default `appdata/dsh/workspace`).
 
 ## How it is put together
@@ -82,7 +82,7 @@ An hourly job checks upstream, rebuilds and smoke-tests the image, and publishes
 | “dsh web authentication required; reopen the URL printed by dsh web” | **Just reload the page.** The browser is holding a session cookie this DSH no longer accepts (it happens after an image update, a container recreation, or another DSH on the same host — cookies ignore ports). The container notices and renews the session by itself; opening `http://<host>:<port>/renew` manually, or clearing that site's cookies, does the same thing. |
 | A tool reports `SANDBOX_UNAVAILABLE` | The two `--security-opt` values were removed from **Extra Parameters**. Put them back. |
 | The browser gets `403` | Your address is not in `ALLOWED_CLIENTS`; a plain `docker run` allows loopback only. |
-| “登录失败 / 操作未完成” when signing in with a DeepSeek account | Upstream only accepts a **loopback** browser origin. Use an API key, or tunnel once: `ssh -L 3081:127.0.0.1:3081 root@<server>`, open `http://127.0.0.1:3081`. |
+| “登录失败 / 操作未完成” when signing in with a DeepSeek account | Upstream only accepts a **loopback** browser origin, so the login tab is redirected to `127.0.0.1` and dies there. **That is the step the bridge finishes:** copy the dead page's address, paste it at `/remote-login`. If the page says the overlay is off, set `REMOTE_SIGNIN=on` (it is the default). Prefer no paste? Tunnel once and use a loopback origin: `ssh -L 3081:127.0.0.1:<published port> root@<server>`, open `http://127.0.0.1:3081`. |
 | Updated, but nothing changed | Unraid recreates a container only when the image digest changes — use **force update**. |
 | Page never finishes loading | `PUBLIC_URL` must match the address you actually open (scheme + host, no path). `docker logs <container> \| head -30` prints the mode it chose. |
 
@@ -95,6 +95,7 @@ An hourly job checks upstream, rebuilds and smoke-tests the image, and publishes
 | `ALLOWED_CLIENTS` | loopback only | Who may connect at all: IPs/CIDRs (and hostnames, matched against `Host`). |
 | `PUBLIC_URL` | empty | Public origin (`https://dsh.example.com`) when a reverse proxy is in front; leave empty for LAN/Tailscale only. |
 | `AUTH_MODE` | `builtin` | `builtin` = password gate inside the container; `none` = your proxy authenticates. Any other value refuses to start. |
+| `REMOTE_SIGNIN` | `on` | DeepSeek **account** sign-in from a remote browser, finished at `/remote-login`. `off` = upstream's loopback-only behaviour. |
 | `DSH_PASSWORD` | `12345678` in the template | Password for the built-in gate (or `DSH_PASSWORD_FILE`). |
 | `TZ` | `Asia/Shanghai` | Container time zone. |
 
@@ -107,12 +108,13 @@ Volumes are taken over as `1000:1000`. Leave that alone — it is not Unraid's u
 | Document | Contents |
 |---|---|
 | [docs/security.md](docs/security.md) | Password gate, host/origin checks, `ALLOWED_CLIENTS`, 403 troubleshooting |
+| [docs/remote-signin.md](docs/remote-signin.md) | Signing in with a DeepSeek **account** from the LAN, Tailscale or behind a proxy |
 | [docs/unraid-sandbox.md](docs/unraid-sandbox.md) | Why Unraid needs those two `--security-opt` values |
 | [docs/migrate-from-another-image.md](docs/migrate-from-another-image.md) | Moving over from another DSH image |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing, releasing, template workflow |
 | [docs/ca-submission.md](docs/ca-submission.md) | Community Applications submission notes |
 
-**Known limits.** Single-user by design: there is no account database, so everyone who reaches the UI acts as the same owner. DeepSeek **account** sign-in needs a loopback browser (use an API key). Upstream is in developer preview, so breaking changes are expected — see the notice at the top. About 0.9 GB on disk.
+**Known limits.** Single-user by design: there is no account database, so everyone who reaches the UI acts as the same owner. DeepSeek **account** sign-in from a remote browser costs one paste step (`/remote-login`); an API key skips it entirely. Upstream is in developer preview, so breaking changes are expected — see the notice at the top. About 0.9 GB on disk.
 
 ## Support
 

@@ -42,7 +42,7 @@ docker run -d --name dsh --restart unless-stopped -p 8080:8080 \
 
 1. **打开界面**：首次访问会自动登录，不需要去日志里复制 token。
 2. **先改口令**：模板自带的是 `12345678`，这是公开值。对应字段是 **Password**（`DSH_PASSWORD`，留空则容器首启随机生成并在日志里打印一次：`docker logs <容器名>`）。用户名默认 `dsh`。
-3. **填 DeepSeek API Key**：同一个面板里的 *Add API key*。用 DeepSeek **账号**登录只在回环地址下可用，见「常见问题」。
+3. **填 DeepSeek API Key**：同一个面板里的 *Add API key*。用 DeepSeek **账号**登录现在从任何浏览器都能完成：登录标签页会停在一个打不开的 `127.0.0.1` 页面上，把那个地址粘到 `/remote-login` 即可收尾——详见 [docs/remote-signin.md](docs/remote-signin.zh-CN.md)。
 4. **指向你的项目**：智能体在 `/workspace` 里干活（默认 `appdata/dsh/workspace`）。
 
 ## 整体是怎么搭的
@@ -82,7 +82,7 @@ Unraid：**Docker → 你的容器 → force update**（或点「apply update」
 | 页面提示 “dsh web authentication required; reopen the URL printed by dsh web” | **刷新页面即可。** 这是浏览器持有一个 DSH 已不再接受的会话 Cookie（镜像更新、容器重建、或同主机另一个 DSH 实例都会造成——Cookie 不区分端口）。容器自己会发现并重新签发会话；手动打开 `http://<主机>:<端口>/renew`、或清掉该站点 Cookie，效果相同。 |
 | 工具报 `SANDBOX_UNAVAILABLE` | **Extra Parameters** 里的两个 `--security-opt` 被删了，补回去。 |
 | 浏览器拿到 `403` | 你的地址不在 `ALLOWED_CLIENTS` 里；裸 `docker run` 默认只放行回环。 |
-| 用 DeepSeek 账号登录报「登录失败 / 操作未完成」 | 上游只接受**回环**来源。改用 API Key，或先开隧道登录一次：`ssh -L 3081:127.0.0.1:3081 root@<服务器>` 后打开 `http://127.0.0.1:3081`。 |
+| 用 DeepSeek 账号登录报「登录失败 / 操作未完成」 | 上游只接受**回环**来源，于是登录标签页被重定向到 `127.0.0.1` 后死在那里。**这一步正是登录桥负责收尾的：**复制那个打不开的页面的地址，粘到 `/remote-login`。若该页面提示 overlay 未启用，把 `REMOTE_SIGNIN` 设为 `on`（本来就是默认值）。不想粘贴？开一次隧道用回环地址登录：`ssh -L 3081:127.0.0.1:<发布端口> root@<服务器>` 后打开 `http://127.0.0.1:3081`。 |
 | 更新了却没变化 | Unraid 只在镜像 digest 变化时重建容器——用 **force update**。 |
 | 页面一直转圈 | `PUBLIC_URL` 必须与你实际打开的地址一致（协议 + 主机，不带路径）。`docker logs <容器名> \| head -30` 会打印它选定的模式。 |
 
@@ -95,6 +95,7 @@ Unraid：**Docker → 你的容器 → force update**（或点「apply update」
 | `ALLOWED_CLIENTS` | 仅回环 | 谁能连进来：IP/CIDR（也可以写域名，按 `Host` 匹配）。 |
 | `PUBLIC_URL` | 空 | 前面有反向代理时填对外地址（`https://dsh.example.com`）；只在局域网/Tailscale 用就留空。 |
 | `AUTH_MODE` | `builtin` | `builtin` = 容器内口令门禁；`none` = 交给前面的代理鉴权。填其它值容器会拒绝启动。 |
+| `REMOTE_SIGNIN` | `on` | 远程浏览器用 DeepSeek **账号**登录（在 `/remote-login` 收尾）。`off` = 回到上游「仅回环」行为。 |
 | `DSH_PASSWORD` | 模板里是 `12345678` | 口令门禁的密码（也可用 `DSH_PASSWORD_FILE`）。 |
 | `TZ` | `Asia/Shanghai` | 容器时区。 |
 
@@ -107,12 +108,13 @@ Unraid：**Docker → 你的容器 → force update**（或点「apply update」
 | 文档 | 内容 |
 |---|---|
 | [docs/security.md](docs/security.zh-CN.md) | 口令门禁、Host/Origin 校验、`ALLOWED_CLIENTS`、403 排障 |
+| [docs/remote-signin.md](docs/remote-signin.zh-CN.md) | 局域网 / Tailscale / 反向代理下用 DeepSeek **账号**登录 |
 | [docs/unraid-sandbox.md](docs/unraid-sandbox.zh-CN.md) | 为什么 Unraid 需要那两个 `--security-opt` |
 | [docs/migrate-from-another-image.md](docs/migrate-from-another-image.zh-CN.md) | 从别的 DSH 镜像迁过来 |
 | [CONTRIBUTING.md](CONTRIBUTING.zh-CN.md) | 构建、测试、发布与模板流程 |
 | [docs/ca-submission.md](docs/ca-submission.zh-CN.md) | Community Applications 提交说明 |
 
-**已知限制。** 单用户设计：没有账户体系，能打开界面的人就是同一个工作区主人。用 DeepSeek **账号**登录需要回环地址（请用 API Key）。上游处于开发者预览阶段，破坏兼容性的变更属于预期之内——见开头的提示。镜像约 0.9 GB。
+**已知限制。** 单用户设计：没有账户体系，能打开界面的人就是同一个工作区主人。远程浏览器用 DeepSeek **账号**登录要多一步粘贴（在 `/remote-login` 收尾）；用 API Key 则完全不需要。上游处于开发者预览阶段，破坏兼容性的变更属于预期之内——见开头的提示。镜像约 0.9 GB。
 
 ## 支持
 
