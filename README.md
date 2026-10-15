@@ -102,6 +102,8 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 - **`Extra Parameters` 放宽了容器外层**（`seccomp` / `systempaths` 各一项）。这是为了换取内层真正有效的沙箱，取舍见上文那篇文档。
 - **首次发布后需要手动把 GHCR 包设为 public**（GitHub 默认私有）：`GitHub → 个人头像 → Packages → dsh → Package settings → Change visibility`。否则 Unraid 上 `docker pull` 会 401。
 - 上游 DSH 仍在 alpha/rc 阶段，接口与行为都可能变；`:latest` 会跟着它走。
+- **镜像解压后约 1.09 GB**（node 运行时 + Caddy + git/ripgrep 等工具 + DSH 的依赖树）。docker.img 在机械盘上的机器（本仓库作者那台就是）首次拉取会明显偏慢。
+- **国内直连 `ghcr.io` 可能很慢**：本仓库作者实测首次拉取约 **1 MB/s、约 20 分钟**（1.09 GB，未登录匿名拉取，能成功但不受镜像源加速——那些源只覆盖 Docker Hub）。若嫌慢，可在宿主给 dockerd 配代理，或改成从你信任的镜像/中转拉取。
 
 ## 图标与商标
 
