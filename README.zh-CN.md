@@ -64,6 +64,7 @@ docker run -d --name dsh --restart unless-stopped \
   -p 8080:8080 \
   -e TZ=Asia/Shanghai \
   -e PUBLIC_URL=https://dsh.example.com \
+  -e ALLOWED_CLIENTS=127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10 \
   -v /mnt/user/appdata/dsh/data:/data \
   -v /mnt/user/appdata/dsh/workspace:/workspace \
   --security-opt seccomp=unconfined \
@@ -73,6 +74,8 @@ docker run -d --name dsh --restart unless-stopped \
 
 然后打开 `http://<你的服务器>:8080`。**不需要从日志里复制带 token 的 URL**，首次访问会自动完成登录。
 
+> 自己用 `docker run` 起容器时，`ALLOWED_CLIENTS` 那一行不能省：否则容器退回"只允许本机"，浏览器会收到 `403`。Unraid 模板与 `compose.yaml` 已经内置了宽松默认值（回环 + 私有网段 + 链路本地 + CGNAT/Tailscale），详见[配置](#配置)。
+
 ## 配置
 
 | 名称 | 默认 | 说明 |
@@ -80,7 +83,7 @@ docker run -d --name dsh --restart unless-stopped \
 | `8080`（容器端口） | — | 唯一需要发布的端口，由镜像内的代理监听。DSH 自己只绑 `127.0.0.1:3080`。 |
 | `/data` | — | `DSH_HOME`：会话、凭据、agent home 与代理状态。**必须持久化**，否则重建容器会丢会话。 |
 | `/workspace` | — | 智能体的工作目录（`DSH_WORKSPACE`）。 |
-| `ALLOWED_CLIENTS` | `127.0.0.1` | **谁可以连接**。逗号分隔：**IP/CIDR** 按连接来源地址匹配，**域名**按 `Host` 头匹配。回环地址永远放行（容器自身的健康检查要用）。默认只允许本机——要让别的机器访问，先把你的网段（如 `127.0.0.1,192.168.0.0/16`）或反向代理的地址加进来。 |
+| `ALLOWED_CLIENTS` | `127.0.0.1` | **谁可以连接**。逗号分隔：**IP/CIDR** 按连接来源地址匹配，**域名**按 `Host` 头匹配。回环地址永远放行（容器自身的健康检查要用）。**Unraid 模板与 `compose.yaml` 已内置宽松默认值**（回环 + 私有网段 + 链路本地 + CGNAT/Tailscale）；裸 `docker run` 会退回"只允许本机"，不设置就是 `403`。 |
 | `TRUSTED_PROXY_CIDRS` | 空 | 可选，仅当前面有反向代理时使用：Caddy 只对这些来源读取 `X-Forwarded-For`，从而按**真实客户端 IP** 匹配 `ALLOWED_CLIENTS`。切勿填写不可信客户端也能发起的网段，否则可伪造该头绕过白名单。 |
 | `PUBLIC_URL` | 空 | 对外 origin，例如 `https://dsh.example.com`（只填协议 + 主机名，不要带路径）。设置后进入 **edge 模式**；留空为 **lan 模式**。 |
 | `DSH_TRUSTED_HOSTS` | 空 | 额外可信的 authority，逗号分隔（如 `dsh.example.com,192.168.1.10:8080`）。仅 edge 模式生效。 |

@@ -64,6 +64,7 @@ docker run -d --name dsh --restart unless-stopped \
   -p 8080:8080 \
   -e TZ=Asia/Shanghai \
   -e PUBLIC_URL=https://dsh.example.com \
+  -e ALLOWED_CLIENTS=127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10 \
   -v /mnt/user/appdata/dsh/data:/data \
   -v /mnt/user/appdata/dsh/workspace:/workspace \
   --security-opt seccomp=unconfined \
@@ -73,6 +74,8 @@ docker run -d --name dsh --restart unless-stopped \
 
 Then open `http://<your-server>:8080`. **You do not need to copy a token URL out of the logs** — the first visit completes the login automatically.
 
+> The `ALLOWED_CLIENTS` line is not optional when you run the container yourself: without it the container falls back to loopback only and answers `403` to your browser. The Unraid template and `compose.yaml` already ship a permissive default (loopback, private ranges, link-local, CGNAT/Tailscale); see the [configuration table](#configuration).
+
 ## Configuration
 
 | Name | Default | Notes |
@@ -80,7 +83,7 @@ Then open `http://<your-server>:8080`. **You do not need to copy a token URL out
 | `8080` (container port) | — | The only port you need to publish, served by the bundled proxy. DSH itself listens on `127.0.0.1:3080` only. |
 | `/data` | — | `DSH_HOME`: sessions, credentials, agent home, proxy state. **Must be persistent**, or rebuilding the container loses your sessions. |
 | `/workspace` | — | The agent's working directory (`DSH_WORKSPACE`). |
-| `ALLOWED_CLIENTS` | `127.0.0.1` | **Who may connect at all.** Comma-separated list; **IPs/CIDRs** are matched against the connecting address, **hostnames** against the `Host` header. Loopback is always allowed, because the container's own healthcheck uses it. The default allows only the host itself — add your LAN subnet (e.g. `127.0.0.1,192.168.0.0/16`) or your reverse proxy's address before anything else can reach the UI. |
+| `ALLOWED_CLIENTS` | `127.0.0.1` | **Who may connect at all.** Comma-separated list; **IPs/CIDRs** are matched against the connecting address, **hostnames** against the `Host` header. Loopback is always allowed, because the container's own healthcheck uses it. The **Unraid template and `compose.yaml` ship a permissive default** (loopback, private ranges, link-local, CGNAT/Tailscale); a bare `docker run` falls back to loopback only, which means `403` until you add your network. |
 | `TRUSTED_PROXY_CIDRS` | empty | Optional, only with a reverse proxy in front. Caddy then reads `X-Forwarded-For` **from these peers only**, so `ALLOWED_CLIENTS` sees the real client address. Never list a range untrusted clients can originate from — they could forge the header and bypass the allowlist. |
 | `PUBLIC_URL` | empty | Public origin, e.g. `https://dsh.example.com` (scheme + host only, no path). Setting it enables **edge mode**; leaving it empty is **lan mode**. |
 | `DSH_TRUSTED_HOSTS` | empty | Extra accepted authorities, comma separated (e.g. `dsh.example.com,192.168.1.10:8080`). Edge mode only. |

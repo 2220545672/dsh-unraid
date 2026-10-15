@@ -19,6 +19,11 @@ services:
       # authenticating reverse proxy fronts this container.
       PUBLIC_URL: ${PUBLIC_URL:-}
       DSH_TRUSTED_HOSTS: ${DSH_TRUSTED_HOSTS:-}
+      # Who may reach the UI. Mirrors the Unraid template's default (loopback,
+      # private ranges, link-local, CGNAT/Tailscale). Compose does not go through
+      # the template, so without this line the container falls back to loopback
+      # only and every request through the published port is answered with 403.
+      ALLOWED_CLIENTS: ${ALLOWED_CLIENTS:-127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,100.64.0.0/10,fc00::/7,fe80::/10}
     volumes:
       - ./data:/data
       - ./workspace:/workspace
