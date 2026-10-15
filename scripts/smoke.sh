@@ -259,6 +259,42 @@ else
     pass 'an invalid AUTH_USER refuses to start the container'
 fi
 
+# 4f — /renew must rescue a browser whose DSH session cookie went stale. That is not
+# hypothetical: a stale cookie makes DSH answer 401 while the bootstrap rule stays out
+# of the way (it only fires when no dsh-auth-* cookie is present at all), so without
+# this route the only cure is clearing cookies by hand.
+STALE_COOKIE='dsh-auth-loopback=stale-value-from-another-instance'
+CODE_STALE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    "${SMOKE_AUTH[@]}" --cookie "${STALE_COOKIE}" "http://127.0.0.1:${PORT}/")"
+if [[ "${CODE_STALE}" == '401' ]]; then
+    pass 'a stale dsh-auth cookie reproduces the 401 the app shows as "authentication required"'
+else
+    fail "a stale dsh-auth cookie answered ${CODE_STALE}, expected 401 (which is the failure mode /renew exists for)"
+fi
+RENEW_LOCATION="$(curl --silent --dump-header - --output /dev/null --max-time 5 \
+    "${SMOKE_AUTH[@]}" --cookie "${STALE_COOKIE}" "http://127.0.0.1:${PORT}/renew" \
+    | grep --ignore-case '^location:' | tr -d '\r' | awk '{print $2}')"
+if [[ "${RENEW_LOCATION}" == /?token=* ]]; then
+    pass '/renew replays the launch token (the one-click recovery step)'
+else
+    fail "/renew answered ${RENEW_LOCATION:-no Location} instead of /?token=..."
+fi
+FRESH_COOKIE="$(curl --silent --dump-header - --output /dev/null --max-time 5 \
+    "${SMOKE_AUTH[@]}" --cookie "${STALE_COOKIE}" "http://127.0.0.1:${PORT}${RENEW_LOCATION}" \
+    | grep --ignore-case '^set-cookie: dsh-auth-' | head -1 | sed 's/^[Ss]et-[Cc]ookie: //' | cut -d';' -f1 | tr -d '\r')"
+if [[ -n "${FRESH_COOKIE}" ]]; then
+    pass '/renew makes DSH mint a fresh session cookie despite the stale one'
+else
+    fail 'following /renew did not mint a fresh dsh-auth cookie'
+fi
+CODE_RESCUED="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    "${SMOKE_AUTH[@]}" --cookie "${FRESH_COOKIE}" "http://127.0.0.1:${PORT}/")"
+if [[ "${CODE_RESCUED}" != '401' ]]; then
+    pass "the rescued session reaches the app (HTTP ${CODE_RESCUED})"
+else
+    fail 'the rescued session still answers 401'
+fi
+
 # 5 — bubblewrap
 if docker exec "${NAME}" bwrap --version >/dev/null 2>&1; then
     pass 'bubblewrap is installed'

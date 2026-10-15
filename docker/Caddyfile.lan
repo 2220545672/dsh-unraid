@@ -45,6 +45,20 @@
 		respond "globalThis.__DSH_AUTHENTICATED_SETTINGS__ = true;" 200
 	}
 
+	# One-click recovery for a browser whose DSH session cookie is no longer valid.
+	# That cookie is signed with a secret this process owns and bound to the authority
+	# DSH sees, so it goes stale when the image is replaced, the container is recreated,
+	# or another DSH instance on the same host wrote a cookie of the same name (cookies
+	# ignore ports). The bootstrap below cannot help then: it deliberately stays out of
+	# the way while *any* dsh-auth-* cookie is present, and DSH answers a stale one with
+	# 401 "authentication required; reopen the URL printed by dsh web". /renew replays the
+	# launch token so DSH mints a fresh cookie, and the next request to / is served
+	# normally — nothing to clear by hand, and no redirect loop, because the rewritten
+	# URL carries the token while the final request carries a valid cookie.
+	route /renew {
+		redir * /?token={$DSH_LAUNCH_TOKEN} 303
+	}
+
 	@dsh_bootstrap {
 		path /
 		not header Cookie *dsh-auth-*
