@@ -49,6 +49,26 @@ function assertWellFormed(text, label) {
 
 const xml = stripComments(rawXml)
 
+/**
+ * Attribute quoting has to be checked textually: a straight double quote inside a
+ * double-quoted attribute silently truncates it, and the file is then not
+ * well-formed XML at all (measured: a Description gained one and only python's
+ * parser noticed). Walk every start tag and require that its attributes are
+ * exactly a sequence of name="value" pairs.
+ */
+function assertAttributesQuoted(text, label) {
+  for (const tag of text.matchAll(/<([A-Za-z][\w.-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g)) {
+    const attrs = tag[2].trim()
+    if (attrs === '' || attrs === '/') continue
+    const rest = attrs.replace(/([\w:.-]+)\s*=\s*"[^"]*"/g, '').trim()
+    if (rest !== '' && rest !== '/') {
+      errors.push(`${label}: <${tag[1]}> has a malformed attribute list (an unescaped quote?): ${rest.slice(0, 60)}`)
+      break
+    }
+  }
+}
+assertAttributesQuoted(rawXml, file.replace(/^.*\//, ''))
+
 const rootElement = assertWellFormed(rawXml, file.replace(/^.*\//, ''))
 if (rootElement !== '' && !/^Container$/i.test(rootElement)) {
   errors.push(`${file.replace(/^.*\//, '')}: expected <Container> as the root element, found <${rootElement}>`)
