@@ -64,7 +64,7 @@ A daily job checks upstream, rebuilds and smoke-tests the image, and publishes o
 | The browser gets `403` | Your address is not in `ALLOWED_CLIENTS`; a plain `docker run` allows loopback only. |
 | “登录失败 / 操作未完成” when signing in with a DeepSeek account | Upstream only accepts a **loopback** browser origin. Use an API key, or tunnel once: `ssh -L 3081:127.0.0.1:3081 root@<server>`, open `http://127.0.0.1:3081`. |
 | Updated, but nothing changed | Unraid recreates a container only when the image digest changes — use **force update**. |
-| Page never finishes loading | `PUBLIC_URL` must match the address you actually open (scheme + host, no path). `docker logs <container> \| head -30` prints the mode it chose. |
+| Page never finishes loading | `PUBLIC_URL` must match the address you actually open (scheme + host, no path). `docker logs` prints the mode it chose. |
 
 ## Settings you may need
 
