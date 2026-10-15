@@ -112,6 +112,7 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 | 查上游版本解析结果 | `node scripts/resolve-dsh-version.mjs --json` |
 | 改图标 | `node scripts/make-icon.mjs`（无第三方依赖，纯 zlib 写 PNG），然后提交 |
 | 改模板 | 编辑 `templates/deepseek-harness.xml`；`__GHCR_OWNER__` / `__REPO__` / `__IMAGE_TAG__` 由 `scripts/render-template.mjs` 渲染 |
+| **首次发布** | 见 [docs/publish.md](docs/publish.md)：建仓库 → 推送 → 两个仓库设置（Workflow permissions 必须为 read/write、首发后把 GHCR 包设为 public）→ 手动触发一次 release |
 | 提交到 CA | 见 [docs/ca-submission.md](docs/ca-submission.md)（老仓库已停止收新模板，现在走仓库 claim） |
 
 ## English summary

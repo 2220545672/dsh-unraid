@@ -30,7 +30,28 @@ RUN set -eux; \
     rm -rf /root/.npm
 
 # ---------------------------------------------------------------------- caddy
-FROM caddy:${CADDY_VERSION}-alpine AS caddy
+# Downloaded from the official release rather than copied out of the caddy
+# image: the asset names below are published for every stable tag
+# (caddy_<version>_linux_amd64.tar.gz / _linux_arm64.tar.gz), so the path is
+# evidence rather than a guess about another image's layout.
+FROM debian:bookworm-slim AS caddy
+ARG CADDY_VERSION
+ARG TARGETARCH
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl; \
+    rm -rf /var/lib/apt/lists/*; \
+    case "${TARGETARCH}" in \
+      amd64) caddy_arch=amd64 ;; \
+      arm64) caddy_arch=arm64 ;; \
+      *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /tmp/caddy.tar.gz \
+      "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_${caddy_arch}.tar.gz"; \
+    tar -xzf /tmp/caddy.tar.gz -C /usr/local/bin caddy; \
+    rm -f /tmp/caddy.tar.gz; \
+    /usr/local/bin/caddy version
 
 # -------------------------------------------------------------------- runtime
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
@@ -71,7 +92,7 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=deps /app /app
-COPY --from=caddy /usr/bin/caddy /usr/local/bin/caddy
+COPY --from=caddy /usr/local/bin/caddy /usr/local/bin/caddy
 COPY docker/entrypoint.sh docker/healthcheck.sh /usr/local/bin/
 COPY docker/Caddyfile.edge docker/Caddyfile.lan /etc/caddy/
 
