@@ -29,26 +29,20 @@ RUN set -eux; \
     test -f /app/node_modules/@deepseek-ai/dsh/lib/bin.js; \
     rm -rf /root/.npm
 
-# Published npm packages carry a lot that no runtime needs. scripts/prune-node-modules.mjs
-# removes it with explicit rules and reports what each rule cost, rather than
-# guessing from file extensions. Measured on 0.2.1-alpha.3: 834 MB -> 416 MB.
-#
-# WITH_LIBREOFFICE_ASSETS=0 also drops @deepseek-ai/libreoffice-kit-wasm (146 MB),
-# the OOXML-to-PDF engine behind document preview. Startup, the plugin bundle and
-# every other feature are unaffected (verified by replaying the real 61-module
-# plugin request against a pruned tree: identical 200 and identical body size) —
-# only converting an Office document would need it. Set it to 1 for the full set.
-ARG WITH_LIBREOFFICE_ASSETS=0
+# Published npm packages carry a lot that no runtime reads: TypeScript sources and
+# declarations, source maps, documentation and test fixtures. scripts/prune-node-modules.mjs
+# removes exactly that, with rules instead of blanket extension matching, and
+# reports what each rule cost. It never removes a package: every functional file
+# (`.js`, `.mjs`, `.wasm`, assets) and every licence file survives, which keeps the
+# upstream feature set intact — including the LibreOffice wasm assets behind
+# document preview. Measured on 0.2.1-alpha.3: node_modules 834 MB -> ~536 MB.
 COPY scripts/prune-node-modules.mjs /tmp/prune-node-modules.mjs
 RUN set -eux; \
-    if [ "${WITH_LIBREOFFICE_ASSETS}" = "1" ]; then \
-        node /tmp/prune-node-modules.mjs --root /app/node_modules; \
-    else \
-        node /tmp/prune-node-modules.mjs --root /app/node_modules --drop-libreoffice-assets; \
-    fi; \
+    node /tmp/prune-node-modules.mjs --root /app/node_modules; \
     rm -f /tmp/prune-node-modules.mjs; \
     test -f /app/node_modules/@deepseek-ai/dsh/lib/bin.js; \
-    test -n "$(find /app/node_modules -name '*.node' -print -quit)"
+    test -n "$(find /app/node_modules -name '*.node' -print -quit)"; \
+    test -d /app/node_modules/@deepseek-ai/libreoffice-kit-wasm
 
 # ---------------------------------------------------------------------- caddy
 # Downloaded from the official release rather than copied out of the caddy
@@ -82,9 +76,7 @@ ARG CADDY_VERSION
 ARG DSH_REVISION=1
 ARG SOURCE_REPO=dsh-unraid
 
-ARG WITH_LIBREOFFICE_ASSETS=0
-LABEL io.dsh.document-preview-assets="${WITH_LIBREOFFICE_ASSETS}" \
-      org.opencontainers.image.title="DeepSeek Harness" \
+LABEL org.opencontainers.image.title="DeepSeek Harness" \
       org.opencontainers.image.description="DeepSeek Harness web UI with a working bubblewrap sandbox on Landlock-less hosts (Unraid)" \
       org.opencontainers.image.version="${DSH_VERSION}" \
       org.opencontainers.image.revision="${DSH_REVISION}" \

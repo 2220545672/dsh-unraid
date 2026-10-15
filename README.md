@@ -124,9 +124,9 @@ Consequences:
 
 **Upstream is a prerelease.** `@deepseek-ai/dsh` currently publishes only `alpha`/`rc` builds, and this image tracks the newest of them (see [Updating and version tags](#updating-and-version-tags)).
 
-**Image size and pull speed.** ~0.67 GB unpacked (image 0.2.1-alpha.3 started at 1.09 GB; the dependency tree is pruned at build time — TypeScript sources, declarations, source maps, docs and test fixtures that no runtime loads), and pulling anonymously from GHCR measured around 1 MB/s on a China line. See [Testing and verification](#testing-and-verification).
+**Image size and pull speed.** ~0.74 GB unpacked (0.2.1-alpha.3 started at 1.09 GB; the dependency tree is pruned at build time), pulling anonymously from GHCR measured around 1 MB/s on a China line. See [Testing and verification](#testing-and-verification).
 
-**Document preview is not bundled.** The image leaves out `@deepseek-ai/libreoffice-kit-wasm` (146 MB), the OOXML-to-PDF engine behind the sidebar's Office-document preview, because it is dead weight for a coding agent and costs every user the download. Startup, plugins and everything else are unaffected. Build with `--build-arg WITH_LIBREOFFICE_ASSETS=1` if you need that conversion.
+**What the size work does and does not touch.** The pruning removes build-time files only — TypeScript sources and declarations, source maps, documentation and test fixtures (349 MB on 0.2.1-alpha.3, verified byte-identical on the plugin bundle a browser loads). No package is removed and every functional file survives, including the LibreOffice wasm assets behind document preview (146 MB) and every licence file.
 
 ## FAQ
 

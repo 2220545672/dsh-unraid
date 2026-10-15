@@ -7,6 +7,11 @@
  * test fixtures. Measured on @deepseek-ai/dsh 0.2.1-alpha.3, that was ~270 MB of
  * an 834 MB tree (plus 146 MB of optional LibreOffice wasm assets).
  *
+ * No package is ever removed, only build-time files inside packages: DeepSeek's
+ * own packages keep every functional file (their .js/.mjs/.wasm/assets and their
+ * licence files are untouched), and an earlier attempt to drop a whole official
+ * package — @deepseek-ai/libreoffice-kit-wasm — was rejected and reverted.
+ *
  * The `.ts` rule is deliberately conservative, because deleting the wrong file
  * would break a package at runtime:
  *   * a package that has no compiled JavaScript at all is left alone, and
@@ -18,7 +23,6 @@
  * extension) are never touched: MIT/BSD require them to travel with the code.
  *
  * Usage: node scripts/prune-node-modules.mjs [--root=/app/node_modules]
- *                                            [--drop-libreoffice-assets]
  *                                            [--dry-run]
  */
 import { readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
@@ -34,7 +38,14 @@ const flag = (name, fallback) => {
 
 const root = flag('root', '/app/node_modules')
 const dryRun = hasFlag('dry-run')
-const dropLibreOffice = hasFlag('drop-libreoffice-assets')
+
+/**
+ * A package is never removed — only build-time files inside packages. DeepSeek's
+ * own packages keep every functional file (.js/.mjs/.wasm/assets) and every
+ * licence file; an earlier attempt to drop a whole official package
+ * (@deepseek-ai/libreoffice-kit-wasm) was rejected and reverted, and the build
+ * now asserts that package is still present.
+ */
 
 const LICENCE = /^(licen[cs]e|copying|notice|authors|contributors)(\..*)?$/i
 const DOC = /\.(md|markdown)$/i
@@ -44,8 +55,6 @@ const COMPILED = /\.(js|cjs|mjs)$/
 const JUNK_FILE = /(\.tsbuildinfo|\.tgz)$|^\.(eslintrc|prettierrc)|^tsconfig.*\.json$/i
 const JUNK_DIR = /^(test|tests|__tests__|__mocks__|example|examples|\.github|\.vscode)$/
 
-/** Packages that are pure data, and safe to drop wholesale when asked. */
-const OPTIONAL_ASSET_PACKAGES = ['@deepseek-ai/libreoffice-kit-wasm']
 
 const removed = new Map()
 const note = (rule, bytes, files = 1) => {
@@ -84,14 +93,10 @@ function findPackages(dir, found = []) {
   } catch {
     return found
   }
-  if (entries.some((e) => e.isFile() && e.name === 'package.json')) found.push(dir)
+  if (entries.some((entry) => entry.isFile() && entry.name === 'package.json')) found.push(dir)
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    if (entry.name === 'node_modules') continue // handled as its own root
-    const child = join(dir, entry.name)
-    if (entry.name.startsWith('@')) findPackages(child, found)
-    else if (entries.some((e) => e.isFile() && e.name === 'package.json') === false) continue
-    else findPackages(child, found)
+    findPackages(join(dir, entry.name), found)
   }
   return found
 }
@@ -103,8 +108,21 @@ function entryPointsUseTypeScript(pkgDir) {
   } catch {
     return true // unreadable manifest: leave the package untouched
   }
-  const fields = [pkg.main, pkg.module, pkg.types, pkg.typings, pkg.bin, pkg.exports]
-  return fields.some((field) => field !== undefined && /\.(ts|mts|cts)("|'|$|\/)/.test(JSON.stringify(field)))
+
+  const isSource = (value) => typeof value === 'string' && /\.(?:ts|mts|cts)$/i.test(value) && !/\.d\.(?:ts|mts|cts)$/i.test(value)
+  // Runtime entry points: these must never resolve to TypeScript.
+  if ([pkg.main, pkg.module, pkg.bin].some((field) => JSON.stringify(field ?? '').includes('.ts') && isSource(typeof field === 'string' ? field : undefined))) return true
+  if ([pkg.main, pkg.module].some(isSource)) return true
+
+  // Inside "exports", a .ts path only matters when it is reachable at runtime:
+  // values under "types"/"typings" are declarations, and custom conditions
+  // (keys starting with "@", such as zod's "@zod/source") are opt-in tooling.
+  const walkExports = (node, key) => {
+    if (typeof node === 'string') return isSource(node) && key !== 'types' && key !== 'typings' && !key.startsWith('@')
+    if (node === null || typeof node !== 'object') return false
+    return Object.entries(node).some(([childKey, child]) => walkExports(child, childKey))
+  }
+  return walkExports(pkg.exports, '')
 }
 
 function walkFiles(dir, visit) {
@@ -118,6 +136,7 @@ function walkFiles(dir, visit) {
     const child = join(dir, entry.name)
     if (entry.isDirectory()) {
       if (JUNK_DIR.test(entry.name)) drop(child, `directory ${entry.name}/`)
+      else if (child !== dir && packageDirs.has(child)) continue // its own iteration handles it
       else walkFiles(child, visit)
     } else if (entry.isFile()) {
       visit(child, entry.name)
@@ -125,11 +144,8 @@ function walkFiles(dir, visit) {
   }
 }
 
-if (dropLibreOffice) {
-  for (const name of OPTIONAL_ASSET_PACKAGES) drop(join(root, name), 'optional asset package')
-}
-
-const packages = new Set([root, ...findPackages(root)])
+const packageDirs = new Set(findPackages(root))
+const packages = [root, ...packageDirs]
 let strippedSources = 0
 
 for (const pkgDir of packages) {

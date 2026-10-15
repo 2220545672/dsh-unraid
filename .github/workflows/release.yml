@@ -133,8 +133,6 @@ jobs:
             NODE_VERSION=${{ needs.resolve.outputs.node }}
             CADDY_VERSION=${{ env.CADDY_VERSION }}
             SOURCE_REPO=${{ github.repository }}
-            # 0 = 不内置 146 MB 的 LibreOffice wasm（文档预览用），见 Dockerfile 注释
-            WITH_LIBREOFFICE_ASSETS=0
 
       - name: Smoke test the image
         run: bash scripts/smoke.sh "dsh-verify:${{ needs.resolve.outputs.version }}"
@@ -179,7 +177,6 @@ jobs:
             CADDY_VERSION=${{ env.CADDY_VERSION }}
             SOURCE_REPO=${{ github.repository }}
             # 0 = 不内置 146 MB 的 LibreOffice wasm（文档预览用），见 Dockerfile 注释
-            WITH_LIBREOFFICE_ASSETS=0
 
       - name: Summary
         run: |
