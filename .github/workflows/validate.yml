@@ -23,13 +23,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Shell syntax
-        run: |
-          set -euo pipefail
-          for file in docker/*.sh scripts/*.sh; do
-            bash -n "${file}"
-            printf 'bash -n ok: %s\n' "${file}"
-          done
+      - name: Static gate (shared with release)
+        run: bash scripts/check-static.sh
 
       - name: Shellcheck
         run: |
@@ -38,52 +33,6 @@ jobs:
           sudo apt-get install -y -qq shellcheck
           shellcheck --version
           shellcheck docker/*.sh scripts/*.sh
-
-      - name: Node syntax
-        run: |
-          set -euo pipefail
-          for file in scripts/*.mjs; do
-            node --check "${file}"
-            printf 'node --check ok: %s\n' "${file}"
-          done
-
-      - name: XML, YAML and JSON well-formedness
-        run: |
-          set -euo pipefail
-          python3 -m pip install --quiet --disable-pip-version-check pyyaml
-          python3 - <<'PY'
-          import glob
-          import json
-          import sys
-          import xml.dom.minidom
-
-          import yaml
-
-          failures = []
-          for path in glob.glob('templates/**/*.xml', recursive=True):
-              try:
-                  xml.dom.minidom.parse(path)
-                  print(f'xml ok: {path}')
-              except Exception as error:  # noqa: BLE001
-                  failures.append(f'{path}: {error}')
-          for path in glob.glob('**/*.yml', recursive=True) + glob.glob('**/*.yaml', recursive=True):
-              try:
-                  with open(path, encoding='utf-8') as handle:
-                      yaml.safe_load(handle)
-                  print(f'yaml ok: {path}')
-              except Exception as error:  # noqa: BLE001
-                  failures.append(f'{path}: {error}')
-          for path in glob.glob('**/*.json', recursive=True):
-              try:
-                  with open(path, encoding='utf-8') as handle:
-                      json.load(handle)
-                  print(f'json ok: {path}')
-              except Exception as error:  # noqa: BLE001
-                  failures.append(f'{path}: {error}')
-          if failures:
-              print('\n'.join(failures), file=sys.stderr)
-              sys.exit(1)
-          PY
 
       - name: Hadolint
         # The official action (rather than the container image, which exposes no
@@ -108,20 +57,6 @@ jobs:
               caddy:2.11.7 validate --config "/caddy/Caddyfile.${config}" --adapter caddyfile
             printf 'caddy validate ok: Caddyfile.%s\n' "${config}"
           done
-
-      - name: Community Apps requirements
-        run: |
-          set -euo pipefail
-          # Layout + placeholder sweep against the official submission docs.
-          node scripts/check-repo.mjs
-          # Template gates: CA minimum/recommended tags, ca_profile.xml, volumes,
-          # sandbox flags.
-          node scripts/check-template.mjs templates/dsh.xml
-          # icon.svg must be exactly what the generator produces (no hand edits).
-          cp icon.svg /tmp/icon.svg.committed
-          node scripts/make-icon-svg.mjs --out=icon.svg
-          diff -u /tmp/icon.svg.committed icon.svg
-          echo "icon.svg is reproducible"
 
       - name: Scripts run end to end
         run: |

@@ -133,7 +133,7 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 | 查上游版本解析结果 | `node scripts/resolve-dsh-version.mjs --json` |
 | 改图标（PNG，供 Docker 模板用） | `node scripts/make-icon.mjs`（需要 `sharp`；素材在 `templates/img/src/`），提交生成的 `templates/img/dsh.png` |
 | 改图标（矢量 `icon.svg`，CA 仓库布局要求） | `node scripts/make-icon-svg.mjs`（无依赖）；CI 会重跑并与提交内容 diff，禁止手改 |
-| 提交前自检 | `node scripts/check-repo.mjs`（官方布局 + 占位符扫描）、`node scripts/check-template.mjs templates/dsh.xml` |
+| 提交前自检 | `bash scripts/check-static.sh` —— validate 与 release 两个工作流**共用**这道闸门（语法、XML/YAML/JSON、CA 布局与模板门槛、图标可复现），所以检查失败的提交不可能发布出镜像或 Release 资产 |
 | 改模板 | 编辑 `templates/dsh.xml`（owner/repo/tag 已渲染为本仓库的值；fork 后用 `scripts/render-template.mjs` 重新渲染） |
 | **首次发布** | 见 [docs/publish.md](docs/publish.md)：建仓库 → 推送 → 两个仓库设置（Workflow permissions 必须为 read/write、首发后把 GHCR 包设为 public）→ 手动触发一次 release |
 | 提交到 CA | 见 [docs/ca-submission.md](docs/ca-submission.md)（官方硬性门槛：`ca_profile.xml`、LICENSE、Validate/Scan）与 [docs/ca-pitfalls.md](docs/ca-pitfalls.md)（前人踩过的坑：声明不符被下架、废弃失去安全更新、模板改动不回流、中心 feed 停摆……） |
