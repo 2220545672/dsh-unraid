@@ -22,7 +22,7 @@
 **On Unraid (recommended)**
 
 1. Open the **Apps** tab and search for **DSH** — it is listed in Community Applications. *Feed not refreshed yet?* Use **Docker → Add Container** and paste [`templates/dsh.xml`](templates/dsh.xml) into the template editor.
-2. Leave **Extra Parameters** as it is. Those two `--security-opt` values are what let the agent's sandbox work on Unraid.
+2. Leave **Extra Parameters** as it is. The two `--security-opt` values are what let the agent's sandbox work on Unraid, and `--restart=unless-stopped` brings it back after a Docker restart.
 3. Apply, then open **`http://<your-server>:8080`**.
 
 **With Docker or Compose**
@@ -41,7 +41,7 @@ docker run -d --name dsh --restart unless-stopped -p 8080:8080 \
 ## First five minutes
 
 1. **Open the UI.** The first visit signs you in — there is no token to copy out of the logs.
-2. **Change the password.** The template ships `12345678`, which is public knowledge. It is the field **访问口令** / `DSH_PASSWORD`. (Cleared, the container generates one and prints it once: `docker logs <container>`.) User name defaults to `dsh`.
+2. **Change the password.** The template ships `12345678`, which is public knowledge. It is the **Password** field (`DSH_PASSWORD`). (Cleared, the container generates one and prints it once: `docker logs <container>`.) User name defaults to `dsh`.
 3. **Add a DeepSeek API key** — *Add API key* in the same panel. Signing in with a DeepSeek **account** only works from a loopback browser; see [Problems](#problems).
 4. **Point it at your project.** The agent works in `/workspace` (default `appdata/dsh/workspace`).
 

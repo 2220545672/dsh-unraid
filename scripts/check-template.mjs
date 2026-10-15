@@ -131,7 +131,7 @@ const configs = [...xml.matchAll(/<Config\s([^>]*)>([\s\S]*?)<\/Config>/g)].map(
 // 2 — how Unraid 7.3.2 resolves a Config, measured twice on this host:
 //   * a non-empty element text is what the container gets (a Port whose text still
 //     said 0.0.0.0:8080 while Default said 0.0.0.0:3082 bound 8080);
-//   * an empty element text falls back to Default (a cleared 访问口令 with
+//   * an empty element text falls back to Default (a cleared Password field with
 //     Default="12345678" still reached the container as 12345678).
 // So an empty text is a legitimate way to ship a default, but a text that disagrees
 // with Default is a trap: the file advertises one value and the container gets another.

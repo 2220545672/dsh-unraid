@@ -22,7 +22,7 @@
 **Unraid 上（推荐）**
 
 1. 打开 **Apps** 标签页，搜索 **DSH**——已收录进 Community Applications。*feed 还没刷新？* 用 **Docker → Add Container**，把 [`templates/dsh.xml`](templates/dsh.xml) 的内容粘贴进模板编辑器。
-2. **Extra Parameters 不要动**——那两个 `--security-opt` 是智能体的沙箱能在 Unraid 上工作的前提。
+2. **Extra Parameters 不要动**——那两个 `--security-opt` 是智能体的沙箱能在 Unraid 上工作的前提；`--restart=unless-stopped` 让它在 Docker 重启后自动回来。
 3. 点 Apply，然后打开 **`http://<你的服务器>:8080`**。
 
 **用 Docker / Compose**
@@ -41,7 +41,7 @@ docker run -d --name dsh --restart unless-stopped -p 8080:8080 \
 ## 头五分钟
 
 1. **打开界面**：首次访问会自动登录，不需要去日志里复制 token。
-2. **先改口令**：模板自带的是 `12345678`，这是公开值。对应字段是 **访问口令** / `DSH_PASSWORD`（留空则容器首启随机生成并在日志里打印一次：`docker logs <容器名>`）。用户名默认 `dsh`。
+2. **先改口令**：模板自带的是 `12345678`，这是公开值。对应字段是 **Password**（`DSH_PASSWORD`，留空则容器首启随机生成并在日志里打印一次：`docker logs <容器名>`）。用户名默认 `dsh`。
 3. **填 DeepSeek API Key**：同一个面板里的 *Add API key*。用 DeepSeek **账号**登录只在回环地址下可用，见「常见问题」。
 4. **指向你的项目**：智能体在 `/workspace` 里干活（默认 `appdata/dsh/workspace`）。
 
