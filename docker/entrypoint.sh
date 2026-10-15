@@ -242,9 +242,16 @@ prepare_directory "${CADDY_DATA_HOME}"
 # and a forked or re-based build should not have to rediscover it.
 if [[ ! -d "${HOME}" || ! -w "${HOME}" ]]; then
     fallback_home="/home/node"
-    warn "HOME='${HOME}' is not writable by uid ${APP_UID}; using ${fallback_home} instead"
-    install -d -o "${APP_UID}" -g "${APP_GID}" -m 0755 "${fallback_home}"
-    export HOME="${fallback_home}"
+    # Best effort, and never fatal: with errexit on, an unguarded install would turn
+    # "the picker cannot list ~" into "the container refuses to start" on a read-only
+    # root filesystem. Only switch when the fallback is genuinely usable.
+    install -d -o "${APP_UID}" -g "${APP_GID}" -m 0755 "${fallback_home}" 2>/dev/null || true
+    if [[ -w "${fallback_home}" ]]; then
+        warn "HOME='${HOME}' is not writable by uid ${APP_UID}; using ${fallback_home} instead"
+        export HOME="${fallback_home}"
+    else
+        warn "HOME='${HOME}' is not writable by uid ${APP_UID} and ${fallback_home} is unavailable; leaving HOME unchanged"
+    fi
 fi
 
 if ! awk '$5 == "/data" { found = 1 } END { exit found ? 0 : 1 }' /proc/self/mountinfo; then
