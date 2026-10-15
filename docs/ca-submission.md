@@ -68,6 +68,11 @@
 | `<WebUI>` | `http://[IP]:[PORT:8080]/` | 端口与模板一致 |
 | 卷 | `/data`、`/workspace` → `appdata/dsh/...` | 首次启动会 chown 成 `1000:1000` |
 | `<Support>` | 仓库 Issues | **提交前必须换成论坛支持帖** |
+| `<TemplateURL>` | 本仓库 `main` 的 raw 模板地址 | 官方标为 recommended（"canonical raw template URL used for identity and review"），已填 |
+| `<ExtraSearchTerms>` | `deepseek harness dsh coding agent ai agent cli` | 让搜 "deepseek" 也能命中（应用名按品牌规范用 DSH） |
+| `<License>` | `MIT` | 应用详情弹窗里展示 |
+| `ca_profile.xml` 的 `<Forum>` | 注释示例 | 开好支持帖后填进去并取消注释 |
+| `<Beta>` | 未设置 | 见 [ca-pitfalls.md](ca-pitfalls.md) D1：建议先不标，但要在支持帖里如实说明上游仍是预发布 |
 
 ### 5. 之后每次上游发版
 
