@@ -41,7 +41,12 @@ fail() { printf 'FAIL %s\n' "$*"; FAILURES=$((FAILURES + 1)); }
 mkdir -p "${WORKDIR}/data" "${WORKDIR}/workspace"
 
 printf 'starting %s\n' "${IMAGE}"
+# ALLOWED_CLIENTS: the checks below curl from the CI host. Depending on the docker
+# networking in use, that request arrives with the bridge gateway as its source
+# address (GitHub runners) or with 127.0.0.1 (a plain host), so both are listed
+# here. The strict default is asserted separately in the access-control section.
 docker run --detach --name "${NAME}" \
+    --env 'ALLOWED_CLIENTS=127.0.0.1,172.16.0.0/12' \
     --publish "127.0.0.1:${PORT}:8080" \
     --security-opt seccomp=unconfined \
     --security-opt systempaths=unconfined \
@@ -164,6 +169,7 @@ docker run --detach --name "${EDGE_NAME}" \
     --security-opt systempaths=unconfined \
     --volume "${WORKDIR}/data-edge:/data" \
     --volume "${WORKDIR}/workspace-edge:/workspace" \
+    --env 'ALLOWED_CLIENTS=127.0.0.1,172.16.0.0/12' \
     --env "PUBLIC_URL=http://127.0.0.1:${EDGE_PORT}" \
     "${IMAGE}" >/dev/null
 
