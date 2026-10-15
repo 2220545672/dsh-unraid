@@ -21,7 +21,7 @@
 
 **On Unraid (recommended)**
 
-1. Open the **Apps** tab and search for **DSH**. *Not listed yet?* Use **Docker → Add Container**, then paste [`templates/dsh.xml`](templates/dsh.xml) into the template editor.
+1. Open the **Apps** tab and search for **DSH** — it is listed in Community Applications. *Feed not refreshed yet?* Use **Docker → Add Container** and paste [`templates/dsh.xml`](templates/dsh.xml) into the template editor.
 2. Leave **Extra Parameters** as it is. Those two `--security-opt` values are what let the agent's sandbox work on Unraid.
 3. Apply, then open **`http://<your-server>:8080`**.
 

@@ -21,7 +21,7 @@
 
 **Unraid 上（推荐）**
 
-1. 打开 **Apps** 标签页，搜索 **DSH**。*还没上架？* 用 **Docker → Add Container**，把 [`templates/dsh.xml`](templates/dsh.xml) 的内容粘贴进模板编辑器。
+1. 打开 **Apps** 标签页，搜索 **DSH**——已收录进 Community Applications。*feed 还没刷新？* 用 **Docker → Add Container**，把 [`templates/dsh.xml`](templates/dsh.xml) 的内容粘贴进模板编辑器。
 2. **Extra Parameters 不要动**——那两个 `--security-opt` 是智能体的沙箱能在 Unraid 上工作的前提。
 3. 点 Apply，然后打开 **`http://<你的服务器>:8080`**。
 

@@ -2,6 +2,8 @@
 
 # 把模板提交到 Unraid Community Applications
 
+**状态：已收录。** 模板已提交，自 2026-10-15 起在目录中上线（按 CA 实际下发的 feed 复核：`DSH` 条目一条，由 `main` 上的 `templates/dsh.xml` 解析而来）。下面的清单保留给下一次提交——fork、另建仓库，或条目万一被下架后重新提交；而**每次有意义的 XML 改动后都要重跑的那一步是 Validate → Scan**。
+
 面向本仓库维护者（fork 后同理）。**先读 [ca-pitfalls.md](ca-pitfalls.zh-CN.md)**：那是官方文档 + 论坛实证整理出的坑清单，含"声明不符被下架""模板改动不回流到已安装机器""废弃即失去安全更新"等真实后果。这里只讲操作顺序。
 
 ## 一、官方硬性门槛（缺一项就卡在提交环节）
@@ -10,9 +12,9 @@
 |---|---|---|
 | 仓库**公开且活跃** | Submit → Docs → Submission Help | ✅ |
 | 根目录有 **OSI 认可许可证** | 同上 | ✅ MIT |
-| 根目录有 **`ca_profile.xml` 且 `<Profile>` 非空** | Docs → Repository Information XML | ✅（`<Forum>` 待填支持帖） |
+| 根目录有 **`ca_profile.xml` 且 `<Profile>` 非空** | Docs → Repository Information XML | ✅（`<Forum>` 已填支持帖） |
 | 每个应用条目有 `<Repository>`（Docker） | Docs → Repository XML Format | ✅ |
-| 提交时跑 **Validate → Scan**（入口是 **`/submit/new`**），且每次有意义的 XML 改动后重跑 | Docs → Submission Help / Builder Guide | ⚠️ 只能在你的 Unraid / CA 界面里做 |
+| 提交时跑 **Validate → Scan**（入口是 **`/submit/new`**），且每次有意义的 XML 改动后重跑 | Docs → Submission Help / Builder Guide | ✅ 已完成——2026-10-15 提交、条目已上线；此后每次有意义的 XML 改动都要重跑 |
 | 仓库布局符合官方建议：根目录 `README.md`、`LICENSE`、`.gitignore`、**`icon.svg`**、`ca_profile.xml`，模板放在 `templates/` | Docs → Builder Guide | ✅ 已补齐 `icon.svg`（矢量，由 `scripts/make-icon-svg.mjs` 生成）；布局由 `scripts/check-repo.mjs` 断言 |
 | 不能留着 starter 的占位值（官方原文：占位图标"会被提交流程拒绝"） | Docs → Builder Guide | ✅ `check-repo.mjs` 会扫 `YOUR_GITHUB_USERNAME`/`example-app` 等占位值 |
 
