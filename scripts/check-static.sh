@@ -57,7 +57,7 @@ import xml.dom.minidom
 import yaml
 
 failures = []
-for path in glob.glob('templates/**/*.xml', recursive=True) + glob.glob('*.xml'):
+for path in glob.glob('templates/**/*.xml', recursive=True) + glob.glob('*.xml') + glob.glob('*.svg'):
     try:
         xml.dom.minidom.parse(path)
         print(f'xml ok: {path}')
