@@ -124,6 +124,8 @@ const explicitPort = /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\]):([0-9]+)\/?$/
 
 因此浏览器必须通过 `http://127.0.0.1:<端口>`（或 `localhost`/`[::1]`）访问 DSH，账号登录才可能开始；局域网、Tailscale、反向代理的 origin 会在发请求之前就被拒，**重试没有用**。
 
+**而且这不是镜像能修的**。同一个 `redirect_uri` 直接提交给平台的 `auth_init`，回环地址成功、其它一律被平台自己的 schema 拒绝（实测：`http://127.0.0.1:3081/oauth/callback` → `code:0`；LAN / Tailscale / 反代域名 → `code:50005 PAYLOAD_SCHEMA_MISMATCH`）。也就是说，就算改镜像里的校验放行，请求也只会在下一步被平台拒掉。平台只有 `auth_init` / `auth_exchange` / `auth_cancel` 三个接口，**没有设备码（device code）通道**可绕开浏览器回调。
+
 两条出路：
 
 * **改用 API Key**：同一个面板里有「添加 API Key」，服务器部署就该走这条；

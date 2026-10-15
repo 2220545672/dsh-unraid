@@ -124,6 +124,8 @@ const explicitPort = /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\]):([0-9]+)\/?$/
 
 So the browser must reach DSH at `http://127.0.0.1:<port>` (or `localhost` / `[::1]`) for account sign-in to start; any LAN, Tailscale or reverse-proxy origin is rejected before a request is even made, and retrying cannot help.
 
+**No image change can lift this.** Submitting the same `redirect_uri` straight to the platform's `auth_init` shows the platform enforces it too: `http://127.0.0.1:3081/oauth/callback` returns `code:0`, while LAN, Tailscale and reverse-proxy origins all return `code:50005 PAYLOAD_SCHEMA_MISMATCH`. Patching the check in the image would only move the rejection one step later. The platform exposes just `auth_init`, `auth_exchange` and `auth_cancel` — there is no device-code channel that avoids the browser callback.
+
 Two ways forward:
 
 * **Use an API key** — the same panel offers *Add API key*, and that is what a server deployment should use.
