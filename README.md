@@ -111,6 +111,19 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 - 本仓库是**社区打包**，与 DeepSeek（深度求索）及 Lime Technology 均无隶属、合作或授权关系。命名遵循 DSH 官方品牌规范：项目名用缩写 **DSH**，只有在描述性文字里才出现 "DeepSeek Harness"。
 - **图标宿主必须国内可达**。实测：`raw.githubusercontent.com` 与 `cdn.jsdelivr.net` **超时**，`github.com/.../raw/...` 会 302 跳到 raw（随后一样超时）；`gh-proxy.com` 约 0.2s、`ghproxy.net` 约 1.0–1.9s，两者字节经 sha256 校验与正本一致。模板的 `<Icon>` 因此指向 `gh-proxy.com`，换宿主只需改这一行。
 
+## 验证记录（可复现）
+
+| 项目 | 证据 |
+|---|---|
+| 多架构发布 | index digest `sha256:a357c91a2f4f86b3ffb6f978017773d2e37684eddcc5e5d9d009f09eb84ce7ab`，`linux/amd64` + `linux/arm64`，另有 2 个 SBOM/provenance attestation manifest |
+| 匿名拉取 | 在 Unraid 宿主上未登录 `docker pull ghcr.io/2220545672/dsh:latest` 成功，digest 与上表一致 |
+| CI 冒烟（每次发版都跑） | lan 模式：`/healthz`=ok、`/` 返回 303 + `dsh-auth-*`、跨站 `/api` 403、受管端点 403、两个 Caddyfile `caddy validate`、容器内 `bwrap` 可用；edge 模式：容器起得来、外来 Origin 403、声明 Origin 可达 DSH |
+| **目标平台验收**（2026-10-15，Unraid 7.3.2 / 内核 `6.18.38-Unraid`） | edge 模式（`PUBLIC_URL` 已设）启动 → `/healthz` = ok；`/` 返回 **303** 且下发 `dsh-auth-*` cookie；容器内 `bwrap … -- /bin/sh -c 'echo SANDBOX_OK'` 输出 **SANDBOX_OK**；全程未触碰正在运行的 `dsh-web` |
+| 图标可达性 | 经 `gh-proxy.com` 取回 8658 B，sha256 `fb9b0e37…` 与本地正本一致 |
+| 模板自检 | `node scripts/check-template.mjs templates/dsh.xml`：CA 的 minimum/recommended 字段齐全、`ca_profile.xml` 的 `<Profile>` 非空、卷与 `Config` 的宿主机路径一致 |
+
+> 目标平台验收这一步抓出过一个 CI 漏掉的真实 bug：镜像里 token 正则把端口写死成内部端口，而 **edge 模式**下 DSH 按 `--public-url` 打印对外端口 → 正则永不匹配 → Caddy 不启动、界面打不开。修复已在 `:latest`（宽松匹配）并补进 CI 的 edge 模式冒烟断言。
+
 ## 维护者手册
 
 | 想做的事 | 怎么做 |
