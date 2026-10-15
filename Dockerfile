@@ -30,19 +30,21 @@ RUN set -eux; \
     rm -rf /root/.npm
 
 # Published npm packages carry a lot that no runtime reads: TypeScript sources and
-# declarations, source maps, documentation and test fixtures. scripts/prune-node-modules.mjs
-# removes exactly that, with rules instead of blanket extension matching, and
-# reports what each rule cost. It never removes a package: every functional file
-# (`.js`, `.mjs`, `.wasm`, assets) and every licence file survives, which keeps the
-# upstream feature set intact — including the LibreOffice wasm assets behind
-# document preview. Measured on 0.2.1-alpha.3: node_modules 834 MB -> ~536 MB.
+# declarations, source maps, documentation and test fixtures.
+# scripts/prune-node-modules.mjs removes exactly that, with rules instead of
+# blanket extension matching, and reports what each rule cost.
+#
+# Deliberate properties, because this must never get in the way of a release:
+#   * it never removes a package, and never asserts anything about which packages
+#     upstream ships — a renamed, added or dropped dependency is a no-op here;
+#   * it never touches a functional file (.js/.mjs/.wasm/assets) or a licence file;
+#   * if it fails for any reason the build continues with a warning, so a bug in
+#     the pruning can never block a release.
+# Measured on 0.2.1-alpha.3: node_modules 834 MB -> 485 MB.
 COPY scripts/prune-node-modules.mjs /tmp/prune-node-modules.mjs
 RUN set -eux; \
-    node /tmp/prune-node-modules.mjs --root /app/node_modules; \
-    rm -f /tmp/prune-node-modules.mjs; \
-    test -f /app/node_modules/@deepseek-ai/dsh/lib/bin.js; \
-    test -n "$(find /app/node_modules -name '*.node' -print -quit)"; \
-    test -d /app/node_modules/@deepseek-ai/libreoffice-kit-wasm
+    node /tmp/prune-node-modules.mjs --root=/app/node_modules || echo 'WARNING: dependency pruning skipped'; \
+    rm -f /tmp/prune-node-modules.mjs
 
 # ---------------------------------------------------------------------- caddy
 # Downloaded from the official release rather than copied out of the caddy

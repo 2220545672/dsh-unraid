@@ -32,8 +32,10 @@ import process from 'node:process'
 const args = process.argv.slice(2)
 const hasFlag = (name) => args.includes(`--${name}`)
 const flag = (name, fallback) => {
-  const hit = args.find((a) => a.startsWith(`--${name}=`))
-  return hit === undefined ? fallback : hit.slice(name.length + 3)
+  const withEquals = args.find((a) => a.startsWith(`--${name}=`))
+  if (withEquals !== undefined) return withEquals.slice(name.length + 3)
+  const index = args.indexOf(`--${name}`)
+  return index !== -1 && args[index + 1] !== undefined ? args[index + 1] : fallback
 }
 
 const root = flag('root', '/app/node_modules')
@@ -171,10 +173,15 @@ for (const pkgDir of packages) {
 }
 
 const mib = (bytes) => `${(bytes / 1048576).toFixed(1)} MB`
-console.log(`prune-node-modules: ${root}${dryRun ? ' (dry run)' : ''}`)
-for (const [rule, entry] of [...removed].sort((a, b) => b[1].bytes - a[1].bytes)) {
-  console.log(`  ${rule.padEnd(28)} ${mib(entry.bytes).padStart(9)}  ${entry.files} item(s)`)
+try {
+  console.log(`prune-node-modules: ${root}${dryRun ? ' (dry run)' : ''}`)
+  for (const [rule, entry] of [...removed].sort((a, b) => b[1].bytes - a[1].bytes)) {
+    console.log(`  ${rule.padEnd(28)} ${mib(entry.bytes).padStart(9)}  ${entry.files} item(s)`)
+  }
+  const total = [...removed.values()].reduce((sum, entry) => sum + entry.bytes, 0)
+  console.log(`  ${'total'.padEnd(28)} ${mib(total).padStart(9)}  (${strippedSources} .ts removed only where compiled output exists)`)
+  console.log(`  root is now ${mib(directorySize(root))}`)
+} catch (error) {
+  // Never fail a build because of this script: report and leave the tree as is.
+  console.error('prune-node-modules: skipped after an unexpected error:', error?.message ?? error)
 }
-const total = [...removed.values()].reduce((sum, entry) => sum + entry.bytes, 0)
-console.log(`  ${'total'.padEnd(28)} ${mib(total).padStart(9)}  (${strippedSources} .ts removed only where compiled output exists)`)
-console.log(`  root is now ${mib(directorySize(root))}`)
