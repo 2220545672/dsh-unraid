@@ -10,7 +10,9 @@
 | 根目录有 **OSI 认可许可证** | 同上 | ✅ MIT |
 | 根目录有 **`ca_profile.xml` 且 `<Profile>` 非空** | Docs → Repository Information XML | ✅（`<Forum>` 待填支持帖） |
 | 每个应用条目有 `<Repository>`（Docker） | Docs → Repository XML Format | ✅ |
-| 提交时跑 **Validate → Scan**，且每次有意义的 XML 改动后重跑 | Docs → Submission Help | ⚠️ 只能在你的 Unraid / CA 界面里做 |
+| 提交时跑 **Validate → Scan**（入口是 **`/submit/new`**），且每次有意义的 XML 改动后重跑 | Docs → Submission Help / Builder Guide | ⚠️ 只能在你的 Unraid / CA 界面里做 |
+| 仓库布局符合官方建议：根目录 `README.md`、`LICENSE`、`.gitignore`、**`icon.svg`**、`ca_profile.xml`，模板放在 `templates/` | Docs → Builder Guide | ✅ 已补齐 `icon.svg`（矢量，由 `scripts/make-icon-svg.mjs` 生成）；布局由 `scripts/check-repo.mjs` 断言 |
+| 不能留着 starter 的占位值（官方原文：占位图标"会被提交流程拒绝"） | Docs → Builder Guide | ✅ `check-repo.mjs` 会扫 `YOUR_GITHUB_USERNAME`/`example-app` 等占位值 |
 
 模板里的 minimum/recommended 字段由 `scripts/check-template.mjs` 断言（Name / Repository / Category / Icon / Overview / Project / Support / TemplateURL 一个不空，卷与 Config 路径一致，沙箱参数在位），**validate 工作流与每次 release 资产生成都会跑它**。
 
@@ -19,6 +21,9 @@
 ## 二、提交前的本地核对
 
 ```bash
+# 0. 仓库布局 + 占位符扫描（对照 Builder Guide）
+node scripts/check-repo.mjs
+
 # 1. 模板自检（含 CA 门槛）
 node scripts/check-template.mjs templates/dsh.xml
 
@@ -71,6 +76,11 @@ CA 与模板指南都要求：**你自己维护的容器必须有 Unraid 论坛�
 | 卷 | `/data`、`/workspace` → `appdata/dsh/...` | 首次启动会 chown 成 `1000:1000` |
 | `<Support>` | 仓库 Issues | **提交前必须换成论坛支持帖** |
 | `<TemplateURL>` | 仓库 `main` 的 raw 模板地址 | 官方标为 recommended（identity and review 用） |
+| `<ReadMe>` | 经代理指向仓库 README | starter 里带这个字段，Unraid 详情页会展示 |
+| `<Requires>` | 保留模板的 Extra Parameters | 官方字段：系统要求文本，正好用来提醒沙箱前提 |
+| `<Changes>` | 指向 Releases 页 | 官方字段：变更日志文本 |
+| 根目录 `icon.svg` | 矢量版应用图标 | 官方布局要求；`ca_profile.xml` 的 `<Icon>` 指向它 |
+| `<Category>` | `Tools:` | starter 注释说明可用 Apps 里的 **Application Categorizer** 插件生成精确分类，再替换 |
 | `<ExtraSearchTerms>` | `deepseek harness dsh coding agent ai agent cli` | 让搜 "deepseek" 也能命中名为 DSH 的应用 |
 | `<License>` | `MIT` | 详情弹窗展示 |
 | `ca_profile.xml` 的 `<Forum>` | 注释示例 | 开好支持帖后填入并取消注释 |

@@ -109,6 +109,20 @@ jobs:
             printf 'caddy validate ok: Caddyfile.%s\n' "${config}"
           done
 
+      - name: Community Apps requirements
+        run: |
+          set -euo pipefail
+          # Layout + placeholder sweep against the official submission docs.
+          node scripts/check-repo.mjs
+          # Template gates: CA minimum/recommended tags, ca_profile.xml, volumes,
+          # sandbox flags.
+          node scripts/check-template.mjs templates/dsh.xml
+          # icon.svg must be exactly what the generator produces (no hand edits).
+          cp icon.svg /tmp/icon.svg.committed
+          node scripts/make-icon-svg.mjs --out=icon.svg
+          diff -u /tmp/icon.svg.committed icon.svg
+          echo "icon.svg is reproducible"
+
       - name: Scripts run end to end
         run: |
           set -euo pipefail

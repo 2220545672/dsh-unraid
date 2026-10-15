@@ -11,10 +11,13 @@
   <Project>https://github.com/deepseek-ai/deepseek-harness</Project>
   <License>MIT</License>
   <ExtraSearchTerms>deepseek harness dsh coding agent ai agent cli</ExtraSearchTerms>
+  <Requires>Docker；请保留模板自带的 Extra Parameters（两个 --security-opt），否则命令沙箱不可用 | Docker; keep the template's Extra Parameters or the command sandbox is unavailable</Requires>
+  <Changes>跟随上游 @deepseek-ai/dsh 自动重建：每次发布见 Releases 页 | Rebuilt automatically for each upstream release; see the Releases page</Changes>
   <Overview>DeepSeek Harness (DSH) 是一个"万物皆插件"的开源编码智能体：浏览器对话、模型与设置管理、会话历史，配合可在服务器上执行命令的工具链。本镜像由 Unraid 用户维护，跟随上游 npm 发版自动重建，并预装 bubblewrap —— 因为 Unraid 内核没有启用 Landlock，缺少它时 DSH 的 bash 工具会直接失败。| DeepSeek Harness (DSH) is an open-source coding agent where everything is a plugin: browser chat, model and settings management, session history, plus tools that run commands on your server. This image is maintained by an Unraid user, rebuilt automatically whenever upstream publishes (tracked from the npm registry), and ships bubblewrap because Unraid kernels have no Landlock — without it DSH's bash tool fails closed.</Overview>
   <Category>Tools:</Category>
-  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <WebUI>http://[IP]:[PORT:8080]</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/2220545672/dsh-unraid/main/templates/dsh.xml</TemplateURL>
+  <ReadMe>https://gh-proxy.com/https://raw.githubusercontent.com/2220545672/dsh-unraid/main/README.md</ReadMe>
   <Icon>https://gh-proxy.com/https://raw.githubusercontent.com/2220545672/dsh-unraid/main/templates/img/dsh.png</Icon>
   <ExtraParams>--security-opt seccomp=unconfined --security-opt systempaths=unconfined</ExtraParams>
   <PostArgs/>

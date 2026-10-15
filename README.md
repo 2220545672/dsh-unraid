@@ -5,7 +5,7 @@
 上游一发布就自动重建、自动推送；镜像里内置 `bubblewrap`，因为 **Unraid 内核没有 Landlock**，缺了它 DSH 的 `bash` 工具会直接 fail-closed。
 
 ```
-ghcr.io/__GHCR_OWNER__/dsh:latest
+ghcr.io/2220545672/dsh:latest
 ```
 
 ## 为什么还要自己做一个镜像
@@ -32,9 +32,9 @@ ghcr.io/__GHCR_OWNER__/dsh:latest
 ### Docker Compose
 
 ```bash
-git clone https://github.com/__GHCR_OWNER__/dsh-unraid.git
+git clone https://github.com/2220545672/dsh-unraid.git
 cd dsh-unraid
-DSH_IMAGE=ghcr.io/__GHCR_OWNER__/dsh:latest PUBLIC_URL=https://dsh.example.com docker compose up -d
+DSH_IMAGE=ghcr.io/2220545672/dsh:latest PUBLIC_URL=https://dsh.example.com docker compose up -d
 ```
 
 ### docker run
@@ -48,7 +48,7 @@ docker run -d --name dsh --restart unless-stopped \
   -v /mnt/user/appdata/dsh/workspace:/workspace \
   --security-opt seccomp=unconfined \
   --security-opt systempaths=unconfined \
-  ghcr.io/__GHCR_OWNER__/dsh:latest
+  ghcr.io/2220545672/dsh:latest
 ```
 
 浏览器打开 `http://<host>:8080`。首次访问会经由 Caddy 注入 DSH 的启动 token，自动换取签名会话 cookie —— **不需要**从日志里复制带 token 的 URL。
@@ -131,8 +131,10 @@ cron(每 6 小时) ──► 解析 npm 上 @deepseek-ai/dsh 的最高版本（�
 | 本地构建 | `docker build --build-arg DSH_VERSION=0.2.1-alpha.3 --build-arg NODE_VERSION=24.21.0 --build-arg CADDY_VERSION=2.11.7 -t dsh:local .` |
 | 本地冒烟 | `bash scripts/smoke.sh dsh:local` |
 | 查上游版本解析结果 | `node scripts/resolve-dsh-version.mjs --json` |
-| 改图标 | `node scripts/make-icon.mjs`（需要 `sharp`；素材在 `templates/img/src/`），提交生成的 `templates/img/dsh.png` |
-| 改模板 | 编辑 `templates/dsh.xml`；`__GHCR_OWNER__` / `__REPO__` / `__IMAGE_TAG__` 由 `scripts/render-template.mjs` 渲染 |
+| 改图标（PNG，供 Docker 模板用） | `node scripts/make-icon.mjs`（需要 `sharp`；素材在 `templates/img/src/`），提交生成的 `templates/img/dsh.png` |
+| 改图标（矢量 `icon.svg`，CA 仓库布局要求） | `node scripts/make-icon-svg.mjs`（无依赖）；CI 会重跑并与提交内容 diff，禁止手改 |
+| 提交前自检 | `node scripts/check-repo.mjs`（官方布局 + 占位符扫描）、`node scripts/check-template.mjs templates/dsh.xml` |
+| 改模板 | 编辑 `templates/dsh.xml`（owner/repo/tag 已渲染为本仓库的值；fork 后用 `scripts/render-template.mjs` 重新渲染） |
 | **首次发布** | 见 [docs/publish.md](docs/publish.md)：建仓库 → 推送 → 两个仓库设置（Workflow permissions 必须为 read/write、首发后把 GHCR 包设为 public）→ 手动触发一次 release |
 | 提交到 CA | 见 [docs/ca-submission.md](docs/ca-submission.md)（官方硬性门槛：`ca_profile.xml`、LICENSE、Validate/Scan）与 [docs/ca-pitfalls.md](docs/ca-pitfalls.md)（前人踩过的坑：声明不符被下架、废弃失去安全更新、模板改动不回流、中心 feed 停摆……） |
 | 模板自检 | `node scripts/check-template.mjs templates/dsh.xml`（validate 与 release 都会跑；含 CA 的 minimum/recommended 字段与 `ca_profile.xml` 门槛） |

@@ -17,7 +17,15 @@ DSH 官方 [品牌素材使用规范](https://github.com/deepseek-ai/deepseek-ha
 
 ## 重新生成
 
+两个产物共用同一套素材，必须一起更新：
+
+| 产物 | 命令 | 依赖 |
+|---|---|---|
+| `icon.svg`（仓库根目录，CA 布局要求，矢量） | `node scripts/make-icon-svg.mjs` | 无（纯字符串合成） |
+| `templates/img/dsh.png`（Docker 模板图标） | `node scripts/make-icon.mjs` | 需要 `sharp` |
+
 ```bash
+node scripts/make-icon-svg.mjs --out=icon.svg
 pnpm add -D sharp          # 或指定已有副本
 node scripts/make-icon.mjs --out=templates/img/dsh.png
 node scripts/make-icon.mjs --flatten='#f4f4f6' --out=/tmp/preview-light.png   # 看浅色卡片上的观感
