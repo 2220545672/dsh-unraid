@@ -1,6 +1,6 @@
 # 维护者手册
 
-面向本仓库的维护者与 fork 者。面向用户的内容在 [README.md](README.md)。
+面向本仓库的维护者与 fork 者。面向用户的内容在 [README.md](README.md)（英文，默认）与 [README.zh-CN.md](README.zh-CN.md)（中文）；两份内容保持一致，改动时请同时更新。
 
 ## 仓库结构
 
