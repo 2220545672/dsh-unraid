@@ -13,7 +13,7 @@
   <ExtraSearchTerms>deepseek harness dsh coding agent ai agent cli</ExtraSearchTerms>
   <Requires>Docker；请保留模板自带的 Extra Parameters（两个 --security-opt），否则命令沙箱不可用 | Docker; keep the template's Extra Parameters or the command sandbox is unavailable</Requires>
   <Changes>跟随上游 @deepseek-ai/dsh 自动重建：每次发布见 Releases 页 | Rebuilt automatically for each upstream release; see the Releases page</Changes>
-  <Overview>DSH（DeepSeek Harness）是开源 AI 编码智能体：在浏览器里与它协作，读写你的项目、执行命令、管理模型与会话历史。本镜像为 Unraid 准备——自动跟随上游发版重建，并内置命令沙箱所需的 bubblewrap，使它在没有 Landlock 的内核上也能正常执行命令。 | DSH (DeepSeek Harness) is an open-source AI coding agent you drive from the browser: it works on your projects, runs commands and keeps your session history. Built for Unraid — rebuilt automatically for every upstream release, with the bubblewrap sandbox bundled so commands work even on kernels without Landlock.</Overview>
+  <Overview>DSH（DeepSeek Harness）是开源 AI 编码智能体：在浏览器里与它协作，读写你的项目、执行命令、管理模型与会话历史。本镜像为 Unraid 准备——自动跟随上游发版重建，并内置命令沙箱所需的 bubblewrap，使它在没有 Landlock 的内核上也能正常执行命令。 容器内置 Caddy 反向代理与可选口令门禁（也可设为 none 交给你现有的 SSO），以 uid 1000 非特权运行。⚠️ 上游处于开发者预览阶段，未来会出现破坏兼容性的变更。 | DSH (DeepSeek Harness) is an open-source AI coding agent you drive from the browser: it works on your projects, runs commands and keeps your session history. Built for Unraid — rebuilt automatically for every upstream release, with the bubblewrap sandbox bundled so commands work even on kernels without Landlock. The container bundles its own reverse proxy and an optional password gate (or set none and delegate to your SSO), and runs unprivileged as uid 1000. ⚠️ Upstream is in developer preview: compatibility-breaking changes are coming.</Overview>
   <Category>Tools:</Category>
   <WebUI>http://[IP]:[PORT:8080]</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/2220545672/dsh-unraid/main/templates/dsh.xml</TemplateURL>
@@ -30,6 +30,10 @@
 - 自动跟随上游：镜像每天检查上游版本，一有新版本就构建、冒烟测试并推送；你只要在 Docker 页点一次更新，不用改任何配置。
 - 命令沙箱真的能用：Unraid 内核没有启用 Landlock，DSH 的沙箱只剩 bubblewrap 一条腿。镜像内置 bubblewrap，模板默认带上它需要的两个启动参数，因此工具不会因为缺少沙箱而拒绝执行。
 - 以非 root 身份运行（uid 1000）、多架构（amd64 / arm64）、**默认开启内置口令门禁**：不填「访问口令」时容器会随机生成一个并打印在启动日志里（Docker 页 → 该容器 → Logs）。若前面已有反向代理 / SSO 做认证，把「认证方式」改为 none。
+
+**整体方案**：容器内置 Caddy 反向代理——对外只开你发布的那个端口，DSH 自身只监听回环，安全响应头、Host/Origin 校验与 `ALLOWED_CLIENTS` 白名单都在这一层完成。认证是可选的：默认 `builtin` 会像 Basic Auth 一样要一次口令（之后用 Cookie 保持，含 WebSocket 握手），设为 `none` 则交给前面的反向代理或 SSO——**不要叠两层登录**。容器以 uid 1000 非特权运行，不挂 docker socket，除你映射的两个卷外不碰宿主目录。
+
+⚠️ **开发者预览**：DeepSeek Harness 处于 _开发者预览_ 阶段，正在快速迭代。**未来将出现破坏兼容性的变更。**（引自上游原文；本镜像会自动跟随这些发布，想自己掌握节奏可钉住版本标签）
 
 **三步开始**
 1. 安装并打开 http://&lt;你的服务器IP&gt;:8080 ：浏览器先弹出登录框，用户名 dsh，口令是「访问口令」字段的值——**模板自带默认值 12345678，请第一时间改成只有你知道的口令**（Docker 页 → 该容器 → Edit → 改「访问口令」→ Apply）。在改掉之前，同网络里知道这个公开默认值的人都能操作你的智能体。顺带说明：用户名字段默认 dsh，也可自行修改。登录后会自动完成令牌引导。想用随机口令而不是默认值，就改用 CLI 传 `-e DSH_PASSWORD=`（口令会打印在日志里，Docker 页 → 该容器 → Logs 找 GENERATED PASSWORD）。
@@ -52,6 +56,10 @@ DSH (DeepSeek Harness) is an open-source coding agent whose interface is a brows
 - Automatic updates: a daily upstream check rebuilds, smoke-tests and publishes whenever a new version lands. You just hit update in the Docker tab.
 - A command sandbox that actually works: Unraid kernels ship without Landlock, which leaves bubblewrap as the only rung for DSH's sandbox. bubblewrap is bundled and the template carries the two launch options it needs, so commands never refuse to run for lack of isolation.
 - Runs as non-root (uid 1000), multi-arch (amd64 / arm64), and **serves its own password gate by default**: leave "访问口令" empty and the container generates one and prints it once in the startup log (Docker tab -> the container -> Logs). If a reverse proxy or SSO already authenticates, set "认证方式" to none.
+
+**How it is put together**: the container bundles Caddy as its reverse proxy — the port you publish is the only way in, DSH itself listens on loopback only, and the security headers, host/origin checks and the `ALLOWED_CLIENTS` allowlist all happen at that layer. Authentication is optional: `builtin` (the default) asks for a password once, like basic auth, and then keeps you signed in with a cookie that also covers the WebSocket handshake; `none` hands that job to your own reverse proxy or SSO — do not stack two logins. The container runs unprivileged as uid 1000, mounts no docker socket, and touches no host directory beyond the two volumes you map.
+
+⚠️ **Developer preview**: DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.** (Quoted from upstream. This image follows those releases automatically; pin a version tag if you would rather move on your own schedule.)
 
 **Get started in three steps**
 1. Install, then open http://&lt;your-server&gt;:8080 — the browser asks for a login first: user dsh, password from the 访问口令 / DSH_PASSWORD field. **The template ships 12345678 as a default: change it to something only you know before you go further** (Docker tab -> the container -> Edit -> 访问口令 -> Apply). Until you do, anybody on your network who knows this public default can drive the agent. The user name field defaults to dsh and can be changed. The token bootstrap then completes automatically. If you prefer a random password over the default, run the container from the CLI with an explicitly empty `-e DSH_PASSWORD=` instead (it is printed once in the log: Docker tab -> the container -> Logs, look for GENERATED PASSWORD).
