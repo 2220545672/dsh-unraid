@@ -15,11 +15,44 @@ import { existsSync } from 'node:fs'
 import process from 'node:process'
 
 const file = resolve(process.argv[2] ?? 'templates/dsh.xml')
-const xml = readFileSync(file, 'utf8')
+const rawXml = readFileSync(file, 'utf8')
 
 const errors = []
 const warnings = []
 const notes = []
+
+/**
+ * Regex matching must never see commented-out markup. A comment that merely
+ * *mentions* <Profile> once made a well-intentioned search-and-replace swallow the
+ * comment terminator and the root element, and every regex-based check kept
+ * passing — only the strict parser in scripts/check-static.sh noticed.
+ */
+const stripComments = (text) => text.replace(/<!--[\s\S]*?-->/g, '')
+
+/** Cheap structural sanity, so a mangled file fails even without python3 around. */
+function assertWellFormed(text, label) {
+  const opens = (text.match(/<!--/g) ?? []).length
+  const closes = (text.match(/-->/g) ?? []).length
+  if (opens !== closes) errors.push(`${label}: unbalanced XML comment (${opens} open, ${closes} close)`)
+  if (/--(?=[^>])/.test(stripComments(text)) === false && text.includes('<!--')) {
+    // a double hyphen inside a comment is illegal XML; only flag genuine comment bodies
+    const bodies = [...text.matchAll(/<!--([\s\S]*?)-->/g)].map((m) => m[1])
+    if (bodies.some((body) => body.includes('--'))) errors.push(`${label}: XML comment contains a double hyphen`)
+  }
+  const root = /^\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*<([A-Za-z][\w.-]*)[\s>]/.exec(text)
+  if (root === null) errors.push(`${label}: no root element found (the file does not start with one)`)
+  else if (!new RegExp(`</${root[1]}>\\s*$`).test(text)) {
+    errors.push(`${label}: root element <${root[1]}> is never closed at the end of the file`)
+  }
+  return root === null ? '' : root[1]
+}
+
+const xml = stripComments(rawXml)
+
+const rootElement = assertWellFormed(rawXml, file.replace(/^.*\//, ''))
+if (rootElement !== '' && !/^Container$/i.test(rootElement)) {
+  errors.push(`${file.replace(/^.*\//, '')}: expected <Container> as the root element, found <${rootElement}>`)
+}
 
 const tag = (name) => {
   const match = new RegExp(`<${name}>([\\s\\S]*?)</${name}>`).exec(xml)
@@ -59,7 +92,8 @@ for (const tagName of REQUIRED_TAGS) {
 // 3c — ca_profile.xml is a hard submission gate: exact name, repository root, non-empty <Profile>
 const profilePath = resolve(dirname(file), '..', 'ca_profile.xml')
 if (existsSync(profilePath)) {
-  const profile = readFileSync(profilePath, 'utf8')
+  const profile = stripComments(readFileSync(profilePath, 'utf8'))
+  assertWellFormed(readFileSync(profilePath, 'utf8'), 'ca_profile.xml')
   const profileText = (/<Profile>([\s\S]*?)<\/Profile>/.exec(profile) ?? [, ''])[1].trim()
   if (profileText === '') errors.push('ca_profile.xml has an empty <Profile>; CA blocks submission finalization in that case')
   else notes.push(`ca_profile.xml: <Profile> ${profileText.length} chars`)
