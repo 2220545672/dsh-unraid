@@ -1,66 +1,79 @@
 [English](publish.md) · **中文**
 
-# 发布到 GitHub 并跑通第一次发布
+# 发布这个模板（以及整体 fork）
 
-面向 fork 本仓库的人（也作为本仓库维护者的操作手册）。整条链路是：**GitHub 仓库 → GitHub Actions 构建 → GHCR 镜像 → Release 里的版本锁定模板 → Community Applications**。
+本仓库是 DSH 的 **Unraid 那一侧**：Community Applications 模板，以及围绕它的检查与文档。
+容器镜像由 [2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) 构建、冒烟测试并
+发布——这里没有 Dockerfile，本仓库也不产出任何 release 或镜像 tag。
 
-## 1. 建仓库并推送
+这份文档是 fork 的操作手册，也是维护者改模板时的checklist。
 
-新建 **公开** 仓库（CA 要求公开可读，图标 URL 也必须是公开地址），名称建议 `dsh-unraid`，**不要**勾选 "Add a README"（本地已有提交历史）：
+## 1. fork 之后要改什么
+
+建一个**公开**仓库（CA 要求可公开读取，图标 URL 也必须是公网可达的），然后按你自己的命名空间
+渲染模板：
 
 ```bash
-git remote add origin git@github.com:<你的用户名>/dsh-unraid.git   # 或 https://github.com/<你的用户名>/dsh-unraid.git
-git push -u origin main
+node scripts/render-template.mjs --owner=<你的用户名> --repo=<你的仓库> --tag=latest \
+  --out=templates/dsh.xml
+node scripts/check-template.mjs templates/dsh.xml
+node scripts/check-repo.mjs
+ALLOW_MISSING_PYTHON=1 bash scripts/check-static.sh        # CI 里不带这个变量
+git add -A && git commit -m "chore: point the template at my namespace" && git push
 ```
 
-## 2. 两个必须确认的仓库设置
+提交进仓库的 `templates/dsh.xml` 是**渲染后的成品**——CA 解析的就是 `main` 上的成品，所以真正
+起作用的是里面具体的 owner/repo/tag 值。
 
-| 设置 | 位置 | 不改会怎样 |
+fork 还要决定两件事：
+
+- **`ca_profile.xml`**：`<Profile>` 文案，以及 `<WebPage>`/`<Icon>`/`<Forum>` 三个 URL 描述的是
+  *你的*仓库。`<Profile>` 非空是硬性提交门槛。
+- **模板里的 `<Support>`**：CA 要求自维护容器用 Unraid **论坛帖**。提交前先开帖（要覆盖哪些内容见
+  [ca-submission.zh-CN.md](ca-submission.zh-CN.md) §3）。
+
+如果你想连镜像也自己构建，那就去 fork
+[dsh-docker](https://github.com/2220545672/dsh-docker)，并把 `<Repository>` 指向你的镜像。它的
+`CONTRIBUTING.md` 讲了 GHCR 包设置（工作流权限、包可见性，以及构建跑在"包未链接的仓库"时需要的
+*Manage Actions access* 授权）。
+
+## 2. 仓库设置
+
+| 设置 | 位置 | 原因 |
 |---|---|---|
-| **Workflow permissions = Read and write** | Settings → Actions → General → Workflow permissions | 新建仓库默认只读。只读时 workflow 里写 `packages: write` 也**不会**被授予，推送 GHCR 直接 403。 |
-| **GHCR 包可见性 = Public** | 首次发布成功后：个人头像 → Packages → `dsh` → Package settings → Change visibility | GHCR 包关联公开仓库时通常自动公开；若仍是私有，Unraid 上匿名 `docker pull` 会 401。 |
+| 公开仓库 + OSI 许可 | 仓库设置 | CA 的 Submission Help 把两条都列为硬性要求 |
+| 根目录 `ca_profile.xml` 且 `<Profile>` 非空 | 仓库根 | 没有它 CA 会拒绝完成提交 |
+| 不需要任何 Actions 密钥 | — | validate 工作流只读本仓库 |
 
-另外两条 GitHub 行为值得知道：
+## 3. 改动怎么进入目录
 
-- **公开仓库连续 60 天无活动，定时工作流会被自动停用。** 本仓库每天查一次上游，只要上游持续发版就不会触发；若上游长期停更，去 Actions 页面点一次 *Enable workflow*。
-- 工作流之间按 `concurrency` 分组：同一分支上新的 release 运行会让**排队中**的旧运行直接作废，所以不会出现多个构建同时抢发布。
+条目在线时**不需要**重跑提交流程。`/submit/new` 会回"already enabled in Community
+Applications and does not need to be submitted"，CA 会在下一次 feed 重建时自己重新解析本仓库。
+2026-10-16 实测：模板 02:00 CST 推送，04:11 CST 出现在 feed 里（全程没有手动 scan）。
 
-## 3. 第一次发布
+要查的是 CA 真正对外提供的那份 feed：`https://ca.unraid.net/assets/feed/applicationFeed.json`；
+同目录的 `/cdn/` 副本会晚约一天。
 
-推送本身就会触发 `release`（`push` 的 `paths` 覆盖 `Dockerfile` / `docker/**` / `scripts/**` / 工作流自身）。也可以手动：Actions → **release** → *Run workflow*。
+⚠️ **模板改动永远到不了已经安装过的机器。** CA 在安装时把 `templates/dsh.xml` 复制成
+`templates-user/my-DSH.xml`，所以本仓库只影响新安装与目录页。必须让所有人都拿到的行为要放进镜像；
+搞错的后果见 [ca-pitfalls.zh-CN.md](ca-pitfalls.zh-CN.md)（B1、B2）。
 
-| 输入 | 说明 |
-|---|---|
-| `version` | 留空 = 自动解析 npm 上 `@deepseek-ai/dsh` 的**最高 semver**（含 alpha/rc） |
-| `force` | 勾上 = 即使 `dsh-<version>` 标签已存在也重建（用于重新发布同一版本） |
+## 4. 这些检查做了什么、看不见什么
 
-流程：解析版本 → 构建 amd64 → **冒烟测试**（不通过就不推）→ 构建并推送 amd64+arm64（`:版本`、`:latest`、`:alpha|rc|stable`）→ 建标签 `dsh-<version>` → 发 Release（附**版本锁定**的模板 XML 与图标）。
+`bash scripts/check-static.sh` 依次跑：shell 与 node 语法；XML/YAML/JSON 结构正确性（python3）；
+CA 仓库要求（`check-repo.mjs`）；模板自检（`check-template.mjs`）；跨仓库的镜像契约
+（`check-image-contract.mjs`）；以及图标可复现性。
 
-排障入口：
+它们**看不见**的东西：
 
-- `verify` 失败 = 镜像启动或冒烟断言没过，日志里会带出容器日志（`/healthz`、token 引导、跨站 403、两个 Caddyfile、`bwrap`）。
-- `publish` 失败 = 多数是第 2 步的 Workflow permissions 没放开。
-- `publish release and template` 失败 = 权限（`contents: write`）或 `gh` 缺失；该 job 对已存在的 Release 走 **clobber 更新**，重复发同一版本不会报错。
+- **镜像的行为是否还与模板描述一致**——契约检查只能证明环境变量的*名字*仍存在于 entrypoint。
+  改变量的语义、改默认值，在这里都是隐形的；要在论坛帖里公告，并同步改两侧；
+- **Unraid 到底怎么解析某个字段**。两条行为是手工实测后写进 `check-template.mjs` 的
+  （元素文本非空时以文本为准；`Mask` 只影响界面显示）；
+- **CA feed 有没有取到这次改动**——那是 feed 的事，不是本仓库能保证的。
 
-## 4. 让模板指向你的命名空间
+## 5. Community Applications 是最后一步
 
-仓库里的 `templates/dsh.xml` 保留 `__GHCR_OWNER__` / `__REPO__` / `__IMAGE_TAG__` 占位符，既避免硬编码也方便 fork；但 **CA 解析的是仓库里的实体文件**，所以提交 CA 前要渲染一次并提交（本仓库当前已按 `2220545672` 渲染）：
-
-```bash
-node scripts/render-template.mjs --owner=<你的用户名> --repo=dsh-unraid --tag=latest --out=templates/dsh.xml
-node scripts/check-template.mjs templates/dsh.xml     # 提交前自检
-git add templates/dsh.xml && git commit -m "chore: render template for <owner>" && git push
-```
-
-图标已提交在 `templates/img/dsh.png`。要换风格需先装 `sharp`：
-
-```bash
-pnpm add -D sharp && node scripts/make-icon.mjs --out=templates/img/dsh.png
-node scripts/make-icon.mjs --flatten='#f4f4f6' --out=/tmp/preview-light.png   # 看浅色卡片观感
-```
-
-素材出处与商标说明见 `templates/img/src/README.md`。
-
-## 5. 最后一步是 CA
-
-镜像、模板、自动跟版都跑通之后，才轮到 Community Applications：见 [ca-submission.md](ca-submission.zh-CN.md)（硬性门槛、Validate/Scan 流程）与 [ca-pitfalls.md](ca-pitfalls.zh-CN.md)（会被下架/废弃的真实案例）。
+只有镜像能拉、模板能装、沙箱能用之后，才轮到提交流程：[ca-submission.zh-CN.md](ca-submission.zh-CN.md)
+（门槛与流程）与 [ca-pitfalls.zh-CN.md](ca-pitfalls.zh-CN.md)（被下架、被弃用、模板改动传不到用户
+手里的真实案例）。

@@ -1,129 +1,114 @@
 **English** · [中文](CONTRIBUTING.zh-CN.md)
 
-# Maintainer handbook
+# Maintainer handbook — the Unraid side
 
-For maintainers of this repository and for anyone who forks it. User-facing content is in [README.md](README.md) (English, the default) and [README.zh-CN.md](README.zh-CN.md) (Chinese); the two are kept in sync, so update both whenever you change one.
+This repository owns the **Community Applications template** for DSH and nothing else:
+`templates/dsh.xml`, the icon, the CA repository profile, the CA documentation and the
+scripts that check them. The container image is built and published by
+[2220545672/dsh-docker](https://github.com/2220545672/dsh-docker); the template installs
+that image's `:latest` tag.
 
 ## Repository layout
 
 ```
 .
-├── Dockerfile                 # three-stage build: DSH deps → Caddy binary → runtime
-├── docker/
-│   ├── entrypoint.sh          # validate env, prepare volumes, pick mode, start Caddy + DSH
-│   ├── Caddyfile.edge         # PUBLIC_URL set: rewrite Host to the public authority, reject foreign Origin
-│   ├── Caddyfile.lan          # PUBLIC_URL empty: pin Host to loopback, strip Origin
-│   └── healthcheck.sh         # container HEALTHCHECK
-├── templates/
-│   ├── dsh.xml                # Unraid container template (this is the real file CA parses)
-│   └── img/                   # icons: dsh.png (used by the template) + src/ (asset and generator docs)
-├── icon.svg                   # repository-level vector icon (required by the CA repo layout; ca_profile.xml points at it)
-├── ca_profile.xml             # CA repository info (must have a non-empty <Profile>)
-├── scripts/                   # version resolution, template render/self-check, icon generation, static gates, smoke tests
-├── docs/                      # user and submission docs
-└── .github/workflows/         # validate (every push) + release (tracks upstream releases)
+├── templates/dsh.xml          # the file Community Applications parses (already rendered)
+├── templates/img/dsh.png      # the icon the template and CA show
+├── templates/img/src/         # source assets + the trademark note
+├── icon.svg                   # repository icon (CA layout requirement; ca_profile.xml points at it)
+├── ca_profile.xml             # CA repository info — a non-empty <Profile> is a hard submission gate
+├── scripts/                   # template self-checks, icon generation, static gate
+└── docs/                      # submission notes, pitfalls, migration guide
 ```
 
-## Local build and self-checks
+## Local checks
 
 ```bash
-# Build (the version number comes from npm, see below)
-docker build \
-  --build-arg DSH_VERSION=0.2.1-alpha.3 \
-  --build-arg NODE_VERSION=24.21.0 \
-  --build-arg CADDY_VERSION=2.11.7 \
-  -t dsh:local .
-
-# Smoke: really starts a container and asserts /healthz, token bootstrap, cross-site 403, Caddy config, bwrap
-bash scripts/smoke.sh dsh:local
-
-# Static gates: exactly what CI runs (syntax, XML/YAML/JSON, CA layout and template bar, icon reproducibility)
-bash scripts/check-static.sh
+ALLOW_MISSING_PYTHON=1 bash scripts/check-static.sh   # the whole gate (this host has no python3)
+node scripts/check-template.mjs templates/dsh.xml     # the template alone
+node scripts/check-repo.mjs                           # CA repository layout + placeholder sweep
+node scripts/check-image-contract.mjs templates/dsh.xml
+node scripts/make-icon-svg.mjs --out=icon.svg && git diff --exit-code icon.svg   # icon must be reproducible
 ```
 
-> `check-static.sh` needs `python3` (structural validation). When this dev machine doesn't have it, use
-> `ALLOW_MISSING_PYTHON=1 bash scripts/check-static.sh` to skip that section — **skipping is not allowed in CI**; a missing python3 fails outright.
+In CI `check-static.sh` runs without `ALLOW_MISSING_PYTHON`: python3 is required there
+for the XML/YAML well-formedness pass, and skipping is not allowed.
 
-## How the upstream version is resolved
+## The template
 
-```bash
-node scripts/resolve-dsh-version.mjs --json     # show the resolved result
-node scripts/resolve-dsh-version.mjs --version=0.2.1-alpha.3
-```
+- **`templates/dsh.xml` is rendered output**, not a source file: owner, repository name
+  and image tag are already substituted. `scripts/render-template.mjs` is the helper for
+  a fork (`--owner=… --repo=… --tag=…`); after rendering, check it with
+  `check-template.mjs` and commit the concrete file. CA parses exactly what is on `main`.
+- **Assertions `check-template.mjs` makes**: CA's minimum/recommended fields are present,
+  the volumes and the `<Config Type="Path">` entries agree on the host paths, a Config's
+  text is either empty or equal to its `Default` (Unraid uses the text — a mismatch shows
+  one value in the GUI and creates the container with another), `<WebUI>`'s port is
+  actually published, no v1 `<Data>`/`<Environment>` blocks, `<Privileged>` is false, and
+  both `--security-opt` values are in `<ExtraParams>`.
+- **Comment pairing is checked** (the regexes strip comments first), because a tag merely
+  *mentioned* in a comment once fooled a search-and-replace into producing a broken file
+  that every regex-based check still accepted.
 
-**Do not read only npm's `latest` tag.** Measured: `@deepseek-ai/dsh`'s `latest` lags behind `alpha` (2026-10-15: `latest`=`0.2.0-rc.2`, `alpha`=`0.2.1-alpha.3`), so a pipeline that reads only `latest` silently downgrades. The script enumerates every published version and takes the highest by semver; prereleases participate in the comparison per the spec.
+## What must not change casually
+
+| Field | Why |
+|---|---|
+| `<Repository>` | It is the image users install. It points at `ghcr.io/2220545672/dsh:latest`. |
+| `<TemplateURL>`, `<Icon>`, `<ReadMe>` | They point at files on this repository's `main` branch; CA and installed machines re-read them. A rename or a move breaks the catalogue entry. |
+| `<Registry>` | Points at the GHCR package page. It follows wherever the package is linked. |
+| `<Support>` | CA requires a **forum thread** for a self-maintained container, not a GitHub issue tracker. |
+| `<Name>` | It is the container name on every machine that installs it. |
+
+A declaration that does not match reality is what gets an entry delisted — see
+[docs/ca-pitfalls.md](docs/ca-pitfalls.md) (A6) for the cases this rule comes from.
+
+## The image contract
+
+Two things couple this repository to the image, and both are checked or documented:
+
+1. **Environment variables.** Every `<Config Type="Variable" Target="NAME">` is a variable
+   the image's `docker/entrypoint.sh` must understand. `scripts/check-image-contract.mjs`
+   fetches that entrypoint from `main` and fails when a variable the template sets is not
+   mentioned there — the failure mode it prevents is silent: the container starts, the
+   field does nothing. It needs the network; offline (China) it degrades to a warning, and
+   the validate workflow fails in CI if the fetch did not happen, so the check cannot be
+   skipped by accident. `TZ` is the one variable the entrypoint legitimately does not read
+   (the base image handles it), and it is allowlisted in the script with that reason.
+2. **The two `--security-opt` flags** in `<ExtraParams>`, which come with the image's
+   sandbox design ([docs/sandbox.md in dsh-docker](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md)).
+   The contract check warns if the image's `compose.yaml` stops carrying them.
+
+**Renaming or removing an environment variable in the image is a breaking change here.**
+Announce it in the forum thread and update `templates/dsh.xml` in the same breath.
 
 ## Icons
 
-Two artifacts, one set of source assets — **they must be updated together**:
+Two artifacts, one source of truth — they are updated together:
 
 ```bash
 node scripts/make-icon-svg.mjs            # → icon.svg (pure vector, no dependencies)
 node scripts/make-icon.mjs                # → templates/img/dsh.png (rasterizes icon.svg, needs sharp)
 ```
 
-- `icon.svg` is the **single source of truth** for the layout; `make-icon.mjs` only rasterizes it. CI re-runs the generator and `diff`s it against what was committed, so **hand edits are not allowed**.
-- Source assets and provenance are in [templates/img/src/README.md](templates/img/src/README.md). The official DSH mark uses `currentColor`; this repository pins it to black. The Unraid badge is 80px by default (256px canvas, roughly 1/10.2 of the area).
-- To change colours or size: `node scripts/make-icon-svg.mjs --badge=72 --size=256`.
+`icon.svg` is the single source of truth for the layout; CI re-runs the generator and
+diffs it against what was committed, so **hand edits are not allowed**. Source assets and
+the trademark note are in [templates/img/src/README.md](templates/img/src/README.md).
 
-## Template
+## Getting a change into the catalogue
 
-`templates/dsh.xml` **is not** a template source file; it is rendered output (owner/repo/tag already substituted with this repository's values). Re-render it after forking:
+While the entry is live you do **not** re-run the submission flow: `/submit/new` answers
+"already enabled in Community Applications and does not need to be submitted", and CA
+re-parses this repository on its own at the next feed rebuild. The measured lag was about
+four hours (template pushed 02:00 CST → live 04:11 CST). See
+[docs/ca-submission.md](docs/ca-submission.md) and [docs/publish.md](docs/publish.md).
 
-```bash
-node scripts/render-template.mjs --owner=<your-username> --repo=dsh-unraid --tag=latest --out=templates/dsh.xml
-node scripts/check-template.mjs templates/dsh.xml        # self-check a single template
-```
+⚠️ **Installed machines never see template changes.** CA copies the template at install
+time, so a change here reaches new installs and the catalogue page only. Anything that has
+to reach everybody belongs in the image.
 
-`check-template.mjs` asserts that: CA's minimum/recommended fields are all present, `ca_profile.xml`'s `<Profile>` is non-empty, the volumes and `Config` agree on the host paths, the sandbox parameters are in place, and **comments are paired and the root element opens and closes correctly** (the regex match strips comments first, so "a tag mentioned inside a comment" cannot fool the check).
+## Versioning
 
-## Releasing
-
-Two workflows:
-
-| Workflow | Trigger | What it does |
-|---|---|---|
-| `validate` | Every push | Static gates + shellcheck + hadolint + `caddy validate` + script end-to-end |
-| `release` | Hourly cron (:17), pushes to relevant paths, manual | Resolve version → **static gates** → build amd64 → smoke → push amd64+arm64 → tag → publish Release (with the version-pinned template and icon) |
-
-**The gates are shared**: the verify step in `release` runs exactly the `scripts/check-static.sh` that `validate` uses, so **a commit that fails the checks publishes nothing** (the `publish` and release-asset jobs get skipped). The two used to be independent, and a red commit could still publish — that has been fixed, don't change it back.
-
-Manual release: Actions → `release` → *Run workflow*.
-
-| Input | Description |
-|---|---|
-| `version` | Empty = resolve the highest version automatically; you can also name an exact version |
-| `force` | Checked = rebuild even if the `dsh-<version>` tag already exists (for re-publishing the same version, or refreshing Release assets) |
-
-Running it again for an already-published version takes the **skip branch**: `resolve` sees the tag already exists → `build=false` → everything after that is skipped, so no build time is wasted.
-
-## Two things to confirm for your first release
-
-| Setting | Where | What happens if you don't change it |
-|---|---|---|
-| Workflow permissions = **Read and write** | Settings → Actions → General | Pushing to GHCR returns 403 (in read-only mode `packages: write` is not granted) |
-| GHCR package visibility = **Public** | Your avatar → Packages → `dsh` → Package settings | An anonymous `docker pull` on Unraid returns 401 |
-
-Also: **a public repository with no activity for 60 consecutive days gets its scheduled workflows disabled automatically**. If upstream goes quiet for a long time, open the Actions page and click *Enable workflow* once.
-
-## Submitting to Community Applications
-
-See [docs/ca-submission.md](docs/ca-submission.md) (the bar and the process: a public repository + an OSI license + a non-empty `<Profile>` in `ca_profile.xml` + a forum support thread + Validate/Scan under `/submit/new`). Before submitting, run `bash scripts/check-static.sh`, then self-check against [docs/ca-pitfalls.md](docs/ca-pitfalls.md) — it records real cases of delisting, deprecation, and template changes that never flowed back.
-
-## Acceptance on a real machine (outside CI)
-
-CI only proves the image starts and passes its assertions; **whether it really runs on the target platform** still needs a separate check (historically this step caught an edge-mode defect that CI missed). The essentials:
-
-```bash
-docker pull ghcr.io/2220545672/dsh:latest          # not logged in: confirm the package is public
-docker run -d --name dsh-acceptance -p 127.0.0.1:18099:8080 \
-  -e PUBLIC_URL=http://127.0.0.1:18099 -e TZ=Asia/Shanghai \
-  -v /tmp/dsh-accept/data:/data -v /tmp/dsh-accept/workspace:/workspace \
-  --security-opt seccomp=unconfined --security-opt systempaths=unconfined \
-  ghcr.io/2220545672/dsh:latest
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18099/healthz   # 200
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18099/          # 303 (with a dsh-auth cookie)
-docker exec dsh-acceptance bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all -- /bin/sh -c 'echo SANDBOX_OK'
-```
-
-Verify with **a separate port and temporary volumes**; don't touch a running instance.
+This repository has no releases. The image's tags and release notes live in
+[dsh-docker](https://github.com/2220545672/dsh-docker/releases); the template follows
+`:latest` and therefore needs no version handshake.

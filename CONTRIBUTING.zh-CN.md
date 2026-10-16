@@ -1,129 +1,105 @@
 [English](CONTRIBUTING.md) · **中文**
 
-# 维护者手册
+# 维护者手册 —— Unraid 这一侧
 
-面向本仓库的维护者与 fork 者。面向用户的内容在 [README.md](README.md)（英文，默认）与 [README.zh-CN.md](README.zh-CN.md)（中文）；两份内容保持一致，改动时请同时更新。
+本仓库只负责 DSH 的 **Community Applications 模板**：`templates/dsh.xml`、图标、CA 仓库
+profile、CA 相关文档，以及检查它们的脚本。容器镜像由
+[2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) 构建与发布；模板安装的就是
+它的 `:latest`。
 
 ## 仓库结构
 
 ```
 .
-├── Dockerfile                 # 三段构建：DSH 依赖 → Caddy 二进制 → 运行时
-├── docker/
-│   ├── entrypoint.sh          # 校验环境、准备卷、选模式、拉起 Caddy + DSH
-│   ├── Caddyfile.edge         # PUBLIC_URL 已设：Host 改写为对外 authority，拒绝外来 Origin
-│   ├── Caddyfile.lan          # PUBLIC_URL 为空：Host 固定 loopback，剥掉 Origin
-│   └── healthcheck.sh         # 容器 HEALTHCHECK
-├── templates/
-│   ├── dsh.xml                # Unraid 容器模板（CA 解析的就是这份实体文件）
-│   └── img/                   # 图标：dsh.png（模板用）+ src/（素材与生成脚本说明）
-├── icon.svg                   # 仓库级矢量图标（CA 仓库布局要求，ca_profile.xml 指向它）
-├── ca_profile.xml             # CA 仓库信息（必须有非空 <Profile>）
-├── scripts/                   # 版本解析、模板渲染/自检、图标生成、静态闸门、冒烟测试
-├── docs/                      # 用户与提交文档
-└── .github/workflows/         # validate（每次推送）+ release（跟版发布）
+├── templates/dsh.xml          # Community Applications 解析的文件（已是渲染后的成品）
+├── templates/img/dsh.png      # 模板与 CA 展示的图标
+├── templates/img/src/         # 素材与商标说明
+├── icon.svg                   # 仓库图标（CA 目录结构要求；ca_profile.xml 指向它）
+├── ca_profile.xml             # CA 仓库信息——<Profile> 非空是硬性提交门槛
+├── scripts/                   # 模板自检、图标生成、静态闸门
+└── docs/                      # 提交说明、坑位清单、迁移指南
 ```
 
-## 本地构建与自检
+## 本地检查
 
 ```bash
-# 构建（版本号取自 npm，见下文）
-docker build \
-  --build-arg DSH_VERSION=0.2.1-alpha.3 \
-  --build-arg NODE_VERSION=24.21.0 \
-  --build-arg CADDY_VERSION=2.11.7 \
-  -t dsh:local .
-
-# 冒烟：会真的起容器并断言 /healthz、token 引导、跨站 403、Caddy 配置、bwrap
-bash scripts/smoke.sh dsh:local
-
-# 静态闸门：与 CI 完全一致（语法、XML/YAML/JSON、CA 布局与模板门槛、图标可复现）
-bash scripts/check-static.sh
+ALLOW_MISSING_PYTHON=1 bash scripts/check-static.sh   # 整套闸门（本机没有 python3）
+node scripts/check-template.mjs templates/dsh.xml     # 只查模板
+node scripts/check-repo.mjs                           # CA 仓库结构 + 占位符扫描
+node scripts/check-image-contract.mjs templates/dsh.xml
+node scripts/make-icon-svg.mjs --out=icon.svg && git diff --exit-code icon.svg   # 图标必须可复现
 ```
 
-> `check-static.sh` 需要 `python3`（结构校验）。这台开发机上没有时用
-> `ALLOW_MISSING_PYTHON=1 bash scripts/check-static.sh` 跳过那一段——**CI 里不允许跳过**，缺 python3 会直接失败。
-
-## 上游版本怎么解析
-
-```bash
-node scripts/resolve-dsh-version.mjs --json     # 看解析结果
-node scripts/resolve-dsh-version.mjs --version=0.2.1-alpha.3
-```
-
-**不要只读 npm 的 `latest` 标签。** 实测 `@deepseek-ai/dsh` 的 `latest` 会落后于 `alpha`（2026-10-15：`latest`=`0.2.0-rc.2`，`alpha`=`0.2.1-alpha.3`），只读 `latest` 的流水线会静默降级。脚本枚举全部已发布版本并按 semver 取最高，预发布按规范参与比较。
-
-## 图标
-
-两个产物、一套素材，**必须一起更新**：
-
-```bash
-node scripts/make-icon-svg.mjs            # → icon.svg（纯矢量，无依赖）
-node scripts/make-icon.mjs                # → templates/img/dsh.png（栅格化 icon.svg，需要 sharp）
-```
-
-- `icon.svg` 是布局的**唯一事实来源**，`make-icon.mjs` 只做栅格化；CI 会重跑生成器并与提交内容 `diff`，**不允许手改**。
-- 素材与出处见 [templates/img/src/README.zh-CN.md](templates/img/src/README.zh-CN.md)。DSH 官方标记用 `currentColor`，本仓库固定为黑色；Unraid 角标默认 80px（画布 256px，面积约 1/10.2）。
-- 换配色/尺寸：`node scripts/make-icon-svg.mjs --badge=72 --size=256`。
+CI 里 `check-static.sh` **不带** `ALLOW_MISSING_PYTHON`：那里必须有 python3 才能做
+XML/YAML 结构校验，不允许跳过。
 
 ## 模板
 
-`templates/dsh.xml` **不是**模板源文件，而是渲染结果（owner/repo/tag 已替换为本仓库的值）。fork 之后重新渲染：
+- **`templates/dsh.xml` 是渲染后的产物**，不是源文件：owner、仓库名、镜像 tag 都已经替换好了。
+  `scripts/render-template.mjs` 是给 fork 用的辅助工具（`--owner=… --repo=… --tag=…`）；渲染完
+  用 `check-template.mjs` 查一遍，再把成品提交上去。CA 解析的就是 `main` 上的成品。
+- **`check-template.mjs` 断言的内容**：CA 的最低/推荐字段齐全；卷与 `<Config Type="Path">` 的宿主
+  路径一致；Config 的文本要么为空、要么等于 `Default`（Unraid 以文本为准——两者不一致会让界面上
+  显示一个值、建出来的容器却是另一个值）；`<WebUI>` 的端口确实被发布；没有 v1 的
+  `<Data>`/`<Environment>` 块；`<Privileged>` 为 false；`<ExtraParams>` 里两个
+  `--security-opt` 都在。
+- **注释配对也在检查范围内**（正则先剥注释）：曾经有一次，某个标签只是被*注释提到*，就让一次
+  查找替换把文件改坏，而所有基于正则的检查仍然通过。
 
-```bash
-node scripts/render-template.mjs --owner=<你的用户名> --repo=dsh-unraid --tag=latest --out=templates/dsh.xml
-node scripts/check-template.mjs templates/dsh.xml        # 单个模板自检
-```
+## 不能随手改的东西
 
-`check-template.mjs` 会断言：CA 的 minimum/recommended 字段齐全、`ca_profile.xml` 的 `<Profile>` 非空、卷与 `Config` 的宿主机路径一致、沙箱参数在位、**注释成对闭合且根元素正确开闭**（正则匹配会先剥离注释，避免"注释里出现某个标签"把检查骗过去）。
-
-## 发布
-
-两个工作流：
-
-| 工作流 | 触发 | 作用 |
-|---|---|---|
-| `validate` | 每次推送 | 静态闸门 + shellcheck + hadolint + `caddy validate` + 脚本端到端 |
-| `release` | 每小时 cron（:17）、推送相关路径、手动 | 解析版本 → **静态闸门** → 构建 amd64 → 冒烟 → 推送 amd64+arm64 → 打标签 → 发 Release（附版本锁定模板与图标） |
-
-**闸门是共用的**：`release` 的 verify 跑的就是 `validate` 用的那份 `scripts/check-static.sh`，所以**检查不过的提交不会发布任何东西**（`publish` 与 release 资产 job 会被 skip）。此前两者独立，红着的提交照样能发布——已经修掉，别改回去。
-
-手动发版：Actions → `release` → *Run workflow*。
-
-| 输入 | 说明 |
+| 字段 | 原因 |
 |---|---|
-| `version` | 留空 = 自动解析最高版本；也可指定精确版本 |
-| `force` | 勾上 = 即使 `dsh-<version>` 标签已存在也重建（重新发布同一版本、或刷新 Release 资产时用） |
+| `<Repository>` | 它就是用户安装的镜像，指向 `ghcr.io/2220545672/dsh:latest`。 |
+| `<TemplateURL>`、`<Icon>`、`<ReadMe>` | 指向本仓库 `main` 上的文件；CA 与已安装的机器都会去读。改名或挪位置会让目录条目失效。 |
+| `<Registry>` | 指向 GHCR 包页面，跟着包的链接关系走。 |
+| `<Support>` | CA 要求自维护容器用**论坛帖**，不是 GitHub issue。 |
+| `<Name>` | 它是每台安装机器上的容器名。 |
 
-已发布版本再次运行会走 **skip 分支**：`resolve` 发现标签已存在 → `build=false` → 后面全部跳过，不会浪费构建时间。
+"声明与实际不符"正是会让条目被下架的雷——这些规则的来源见
+[docs/ca-pitfalls.zh-CN.md](docs/ca-pitfalls.zh-CN.md)（A6）。
 
-## 首次发布要确认的两件事
+## 与镜像之间的契约
 
-| 设置 | 位置 | 不改会怎样 |
-|---|---|---|
-| Workflow permissions = **Read and write** | Settings → Actions → General | 推送 GHCR 会 403（只读时 `packages: write` 不被授予） |
-| GHCR 包可见性 = **Public** | 个人头像 → Packages → `dsh` → Package settings | Unraid 上匿名 `docker pull` 会 401 |
+两个仓库之间只有两处耦合，且都有检查或文档兜着：
 
-另外：**公开仓库连续 60 天无活动，定时工作流会被自动停用**。上游若长期停更，去 Actions 页点一次 *Enable workflow*。
+1. **环境变量。** 模板里每个 `<Config Type="Variable" Target="NAME">` 都是镜像
+   `docker/entrypoint.sh` 必须认识的变量。`scripts/check-image-contract.mjs` 会从 `main`
+   拉取那个 entrypoint，一旦模板设置的变量在那边找不到就**报错**——它防的是一种静默失效：
+   容器照常启动，而那个字段什么也不做。它需要网络；离线（国内）会退化成警告，而 validate 工作流
+   在 CI 里会因为"根本没取到"直接失败，所以这条检查不会被悄悄跳过。`TZ` 是唯一一个 entrypoint
+   合理地不读的变量（由基础镜像处理），已在脚本里带原因地列入白名单。
+2. **`<ExtraParams>` 里的两个 `--security-opt`**，它们来自镜像的沙箱设计（
+   [dsh-docker 的 docs/sandbox.zh-CN.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.zh-CN.md)）。
+   如果镜像的 `compose.yaml` 不再带这两个参数，契约检查会给出警告。
 
-## 提交到 Community Applications
+**在镜像侧改环境变量名或删掉环境变量，对本仓库就是破坏性变更。** 要在论坛帖里公告，并同步改
+`templates/dsh.xml`。
 
-见 [docs/ca-submission.zh-CN.md](docs/ca-submission.zh-CN.md)（门槛与流程：仓库公开 + OSI 许可证 + `ca_profile.xml` 非空 `<Profile>` + 论坛支持帖 + `/submit/new` 的 Validate/Scan）。提交前先跑 `bash scripts/check-static.sh`，再按 [docs/ca-pitfalls.zh-CN.md](docs/ca-pitfalls.zh-CN.md) 自查一遍——那里记着下架、废弃、模板改动不回流等真实案例。
+## 图标
 
-## 上机验收（CI 之外）
-
-CI 只证明镜像能起、能通过断言；**目标平台上真实可跑**还要单独验一次（历史上这一步抓出过 CI 漏掉的 edge 模式缺陷）。要点：
+两个产物、一个事实来源，必须一起更新：
 
 ```bash
-docker pull ghcr.io/2220545672/dsh:latest          # 未登录，确认包是 public
-docker run -d --name dsh-acceptance -p 127.0.0.1:18099:8080 \
-  -e PUBLIC_URL=http://127.0.0.1:18099 -e TZ=Asia/Shanghai \
-  -v /tmp/dsh-accept/data:/data -v /tmp/dsh-accept/workspace:/workspace \
-  --security-opt seccomp=unconfined --security-opt systempaths=unconfined \
-  ghcr.io/2220545672/dsh:latest
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18099/healthz   # 200
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18099/          # 303（带 dsh-auth cookie）
-docker exec dsh-acceptance bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all -- /bin/sh -c 'echo SANDBOX_OK'
+node scripts/make-icon-svg.mjs            # → icon.svg（纯矢量，零依赖）
+node scripts/make-icon.mjs                # → templates/img/dsh.png（栅格化 icon.svg，需要 sharp）
 ```
 
-用**独立端口与临时卷**验证，不要动正在运行的实例。
+`icon.svg` 是版式的唯一来源；CI 会重跑生成器并与提交的版本 diff，所以**不允许手工编辑**。
+素材与商标说明见 [templates/img/src/README.zh-CN.md](templates/img/src/README.zh-CN.md)。
+
+## 改动怎么进入目录
+
+条目在线时**不需要**重跑提交流程：`/submit/new` 会回答"already enabled in Community
+Applications and does not need to be submitted"，CA 会在下一次 feed 重建时自己重新解析本仓库。
+实测延迟约四小时（模板 02:00 CST 推送 → 04:11 CST 生效）。见
+[docs/ca-submission.zh-CN.md](docs/ca-submission.zh-CN.md) 与 [docs/publish.zh-CN.md](docs/publish.zh-CN.md)。
+
+⚠️ **已安装的机器永远看不到模板改动。** CA 在安装时复制模板，所以这里的改动只影响新安装与目录页。
+必须让所有人都拿到的行为要放进镜像。
+
+## 版本
+
+本仓库没有 release。镜像的 tag 与发布说明在
+[dsh-docker](https://github.com/2220545672/dsh-docker/releases)；模板跟随 `:latest`，因此不需要
+任何版本握手。

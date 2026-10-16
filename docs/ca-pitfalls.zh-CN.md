@@ -34,7 +34,7 @@
 
 | # | 坑 | 依据 | 我们的处置 |
 |---|---|---|---|
-| C1 | **"AI 生成、缺少人工审查"是明确的扣分项**：CA 社区开发者原话——"both plugins give me a very solid sense of 'this was AI-coded without a substantial human review / understanding of what it does'"，并指出不符合约定会引发"quality/safety"担忧 | 论坛（Community Developer） | ✅ 代码量小且可解释：Dockerfile + 两个 Caddyfile + 一个 entrypoint + 三个脚本；有冒烟测试、模板自检、沙箱对照实验文档。**你本人要能讲清每一处**（尤其两个 `--security-opt`） |
+| C1 | **"AI 生成、缺少人工审查"是明确的扣分项**：CA 社区开发者原话——"both plugins give me a very solid sense of 'this was AI-coded without a substantial human review / understanding of what it does'"，并指出不符合约定会引发"quality/safety"担忧 | 论坛（Community Developer） | ✅ 两侧代码量都小且可解释：本仓库是模板 + 四个检查脚本；镜像（在 [dsh-docker](https://github.com/2220545672/dsh-docker) 构建）是 Dockerfile + 两个 Caddyfile + 一个 entrypoint + 三个脚本，另有冒烟测试、模板自检与沙箱对照实验文档。**你本人要能讲清每一处**（尤其两个 `--security-opt`） |
 | C2 | **"别人会替我审代码"是错误预期**："It's your plugin. You write it, not the CA team… This expectation that someone else will do a code review for you is wrong." | 论坛 | ⚠️ 上架即你负责；支持帖要给出排障路径 |
 | C3 | **容器比插件更被鼓励**："Plugins which are better suited as a docker application are not eligible for inclusion in CA"，且容器"better from a security/safety standpoint" | 论坛（Community Developer 转述 CA 政策） | ✅ 我们走 Docker 模板路线（正确的那条） |
 | C4 | **root / docker.sock / `/boot` / 模板里的凭据**是审核重点：社区明确列出 `/boot`、`/var/run/docker.sock` 属于应当排除的宿主路径；另一帖强调"Claude Code running as root has unrestricted ability…" | 论坛 | ✅ 容器内先 root 初始化再降权到 **uid 1000**；不挂 docker socket、不挂 `/boot`；**模板里不要求任何 API key**（模型凭据由 DSH 自己在 `/data` 里管理） |

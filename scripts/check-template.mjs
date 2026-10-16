@@ -170,7 +170,7 @@ if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) errors.push(`<Name> is missing o
 const repository = tag('Repository')
 if (!/^[\w.-]+(\/[\w.-]+)+(:[\w.-]+)?$/.test(repository)) errors.push(`<Repository> does not look like an image reference: "${repository}"`)
 else notes.push(`image: ${repository}`)
-if (repository.endsWith(':latest')) notes.push('image tag is latest (CA convention; the release workflow also ships version-pinned templates)')
+if (repository.endsWith(':latest')) notes.push('image tag is latest (CA convention; the image repository publishes version tags too, and a user can pin one by editing the field)')
 
 // 3b — the fields the CA docs list as minimum/recommended (Repository XML Format
 //      plus the parser field catalog): without them a scan or a reviewer bounces it
@@ -203,10 +203,16 @@ const support = tag('Support')
 if (!support.startsWith('https://')) errors.push(`<Support> must be an https URL, got "${support}"`)
 else if (!support.includes('forums.unraid.net')) warnings.push(`<Support> points at ${support}; Community Applications expects an Unraid forum support thread for containers you maintain yourself`)
 
-// 5 — the sandbox flags are the whole point of this template
+// 5 — the sandbox flags are the whole point of this template. The reasoning lives with
+//     the image now (this repository no longer carries the entrypoint or the sandbox
+//     document): https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md
 const extra = tag('ExtraParams')
 for (const flag of ['seccomp=unconfined', 'systempaths=unconfined']) {
-  if (!extra.includes(flag)) errors.push(`<ExtraParams> must contain --security-opt ${flag} (see docs/unraid-sandbox.md)`)
+  if (!extra.includes(flag)) {
+    errors.push(
+      `<ExtraParams> must contain --security-opt ${flag} (why: dsh-docker docs/sandbox.md — without it the agent's sandbox cannot start on Unraid)`,
+    )
+  }
 }
 
 // 6 — ports

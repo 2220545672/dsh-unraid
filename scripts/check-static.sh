@@ -1,18 +1,13 @@
 #!/usr/bin/env bash
 #
-# The static gate shared by `.github/workflows/validate.yml` and the verify job of
-# `.github/workflows/release.yml`.
+# The static gate for this repository: the Community Applications template.
 #
-# Why one script: the two workflows run independently, so a check that only lives
-# in validate cannot stop a publish — a commit could be red in validate and still
-# build, push and tag an image. Both call this, which makes "the checks failed"
-# imply "nothing ships".
-#
-# Coverage: shell syntax, node syntax, XML/YAML/JSON well-formedness, the
-# Community Apps repository/template requirements, and the reproducibility of the
-# vector icon. Tool-based linting (shellcheck, hadolint, `caddy validate`) stays in
-# validate.yml, and release.yml additionally builds the image and smoke-tests the
-# running container before publishing.
+# This repository used to build the container image too. The image moved to
+# 2220545672/dsh-docker, and the checks that belong to it (shell/node syntax of the
+# entrypoint, hadolint, `caddy validate`, the image smoke test) moved with it. What
+# is left is what a *template* repository has to guarantee, plus one
+# cross-repository check: the environment variables the template hands the container
+# must still exist in that image's entrypoint.
 #
 # Usage: bash scripts/check-static.sh
 set -euo pipefail
@@ -20,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo '== shell syntax =='
-for file in docker/*.sh scripts/*.sh; do
+for file in scripts/*.sh; do
   bash -n "${file}"
   printf 'bash -n ok: %s\n' "${file}"
 done
@@ -87,6 +82,10 @@ echo
 echo '== Community Apps requirements =='
 node scripts/check-repo.mjs
 node scripts/check-template.mjs templates/dsh.xml
+
+echo
+echo '== the template still matches the image it installs =='
+node scripts/check-image-contract.mjs templates/dsh.xml
 
 echo
 echo '== icon reproducibility =='

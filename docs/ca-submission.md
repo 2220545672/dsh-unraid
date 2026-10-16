@@ -37,15 +37,16 @@ docker pull ghcr.io/<owner>/dsh:latest
 # 3. The template installs
 #    Unraid: Docker → Add Container → paste the contents of templates/dsh.xml (or import dsh.xml from the release assets)
 #    After installing, confirm: the Web UI opens, /data and /workspace persist,
-#             and a command run inside DSH does not report SANDBOX_UNAVAILABLE (sandbox usable, see unraid-sandbox.md)
+#             and a command run inside DSH does not report SANDBOX_UNAVAILABLE (sandbox usable — see
+#             https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md)
 ```
 
 ## 3. Open a forum support thread (CA's requirement for self-maintained containers)
 
 Both CA and the template guide require: **a container you maintain yourself must have an Unraid forum support thread**, and `<Support>` must point to it rather than to GitHub Issues. The support thread must at least make clear:
 
-- what this application is, where the image is, and how to upgrade (this repository tracks versions automatically, users only need to force update);
-- **why those two `--security-opt` are needed** (the Unraid kernel has no Landlock → bubblewrap is the only usable sandbox layer; see [unraid-sandbox.md](unraid-sandbox.md)) — this is the point reviewers and users are most likely to press on;
+- what this application is, where the image is, and how to upgrade ([2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) tracks versions automatically, users only need to force update);
+- **why those two `--security-opt` are needed** (the Unraid kernel has no Landlock → bubblewrap is the only usable sandbox layer; see [dsh-docker's docs/sandbox.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md)) — this is the point reviewers and users are most likely to press on;
 - known limitations (upstream is still pre-release and `:latest` follows the newest version; the built-in password gate has no 2FA/audit, and if you need those, set `AUTH_MODE` to `none` and hand it to SSO);
 - **secure by default**: with nothing configured, what you install still comes with a password (`AUTH_MODE=builtin` + a password generated on first start and printed once), so you never end up with "a freshly installed, unauthenticated web UI that executes commands"; this is the answer if CA review asks.
 - troubleshooting entry points (`/healthz`; the first lines of the entrypoint in the container log state the mode and the startup result).

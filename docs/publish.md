@@ -1,66 +1,92 @@
 **English** · [中文](publish.zh-CN.md)
 
-# Publishing to GitHub and getting the first release through
+# Publishing this template (and forking the whole thing)
 
-For people who fork this repository (it also serves as the maintainer's runbook). The whole chain is: **GitHub repository → GitHub Actions build → GHCR image → version-pinned template in the Release → Community Applications**.
+This repository is the **Unraid side** of DSH: the Community Applications template plus
+the checks and documentation around it. The container image is built, smoke-tested and
+published by [2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) — there is
+no Dockerfile here and this repository produces no releases or image tags.
 
-## 1. Create the repository and push
+This document is the runbook for a fork, and for the maintainer's own changes to the
+template.
 
-Create a **public** repository (CA requires public readability, and the icon URL must be a public address too); `dsh-unraid` is the suggested name. Do **not** tick "Add a README" (the commit history already exists locally):
+## 1. Fork: what you have to change
+
+Create a public repository (CA requires public readability, and the icon URL must be
+public too), then render the template for your own namespace:
 
 ```bash
-git remote add origin git@github.com:<your-username>/dsh-unraid.git   # or https://github.com/<your-username>/dsh-unraid.git
-git push -u origin main
+node scripts/render-template.mjs --owner=<your-username> --repo=<your-repo> --tag=latest \
+  --out=templates/dsh.xml
+node scripts/check-template.mjs templates/dsh.xml
+node scripts/check-repo.mjs
+ALLOW_MISSING_PYTHON=1 bash scripts/check-static.sh        # CI runs it without that variable
+git add -A && git commit -m "chore: point the template at my namespace" && git push
 ```
 
-## 2. Two repository settings you must confirm
+The committed `templates/dsh.xml` is **rendered output** — CA parses exactly what is on
+`main`, so the concrete owner/repo/tag values are what matter.
 
-| Setting | Where | What happens if you leave it |
+Two more things a fork must decide:
+
+- **`ca_profile.xml`** — the `<Profile>` text and the `<WebPage>`/`<Icon>`/`<Forum>` URLs
+  describe *your* repository. A non-empty `<Profile>` is a hard submission gate.
+- **`<Support>`** in the template — CA requires an Unraid **forum thread** for a container
+  you maintain yourself. Open one before submitting (see
+  [ca-submission.md](ca-submission.md) §3 for what it has to cover).
+
+If you also want to build your own image, fork
+[dsh-docker](https://github.com/2220545672/dsh-docker) instead and point `<Repository>`
+at your image. Its `CONTRIBUTING.md` covers the GHCR package settings (workflow
+permissions, package visibility, and the *Manage Actions access* grant a build needs when
+it runs in a repository the package is not linked to).
+
+## 2. Repository settings
+
+| Setting | Where | Why |
 |---|---|---|
-| **Workflow permissions = Read and write** | Settings → Actions → General → Workflow permissions | New repositories default to read-only. While read-only, even a `packages: write` in the workflow is **not** granted, and pushing to GHCR returns 403 outright. |
-| **GHCR package visibility = Public** | After the first successful release: your avatar → Packages → `dsh` → Package settings → Change visibility | A GHCR package tied to a public repository is usually public automatically; if it is still private, an anonymous `docker pull` on Unraid returns 401. |
+| Public repository + OSI license | repository settings | CA's Submission Help lists both as hard requirements |
+| `ca_profile.xml` with a non-empty `<Profile>` | repository root | CA blocks submission finalization without it |
+| No Actions secrets needed | — | the validate workflow only reads this repository |
 
-Two more GitHub behaviours are worth knowing:
+## 3. How a change reaches the catalogue
 
-- **A public repository with 60 consecutive days of no activity has its scheduled workflows disabled automatically.** This repository checks upstream every hour, so as long as upstream keeps releasing this will not trigger; if upstream goes quiet for a long time, open the Actions page and click *Enable workflow* once.
-- Workflows are grouped by `concurrency`: a new release run on the same branch cancels the older **queued** run outright, so several builds never race to publish at once.
+While the entry is live you do **not** re-run the submission flow. `/submit/new` answers
+"already enabled in Community Applications and does not need to be submitted", and CA
+re-parses this repository at its next feed rebuild. Measured on 2026-10-16: template
+pushed 02:00 CST, live in the feed 04:11 CST (no manual scan at any point).
 
-## 3. The first release
+The feed to check is the one CA actually serves —
+`https://ca.unraid.net/assets/feed/applicationFeed.json`; its `/cdn/` sibling lags about
+a day behind.
 
-The push itself triggers `release` (the `push` `paths` cover `Dockerfile` / `docker/**` / `scripts/**` / the workflow itself). You can also do it manually: Actions → **release** → *Run workflow*.
+⚠️ **A template change never reaches a machine that already installed it.** CA copies
+`templates/dsh.xml` to `templates-user/my-DSH.xml` at install time, so this repository
+only affects new installs and the catalogue page. Behaviour that must reach everybody
+belongs in the image; the consequences of getting this wrong are in
+[ca-pitfalls.md](ca-pitfalls.md) (B1, B2).
 
-| Input | Description |
-|---|---|
-| `version` | Empty = resolve the **highest semver** of `@deepseek-ai/dsh` on npm automatically (alpha/rc included) |
-| `force` | Ticked = rebuild even if the `dsh-<version>` tag already exists (for re-releasing the same version) |
+## 4. What the checks do, and what they cannot
 
-Flow: resolve the version → build amd64 → **smoke test** (nothing is pushed if it fails) → build and push amd64+arm64 (`:version`, `:latest`, `:alpha|rc|stable`) → create the `dsh-<version>` tag → publish the Release (with the **version-pinned** template XML and icon).
+`bash scripts/check-static.sh` runs, in order: shell and node syntax; XML/YAML/JSON
+well-formedness (python3); the CA repository requirements (`check-repo.mjs`); the template
+self-check (`check-template.mjs`); the cross-repository image contract
+(`check-image-contract.mjs`); and the icon's reproducibility.
 
-Troubleshooting entry points:
+What none of them can see:
 
-- `verify` fails = the image did not start or a smoke assertion failed; the log carries the container logs along (`/healthz`, token bootstrap, cross-site 403, the two Caddyfiles, `bwrap`).
-- `publish` fails = usually the Workflow permissions from step 2 were not opened up.
-- `publish release and template` fails = permissions (`contents: write`) or a missing `gh`; that job does a **clobber update** on an existing Release, so re-releasing the same version does not error.
+- **whether the image still behaves the way the template describes** — the contract check
+  only proves the environment variable *names* still exist in the entrypoint. Renaming a
+  variable's meaning, or changing a default, is invisible here; announce it in the forum
+  thread and update both sides together;
+- **how Unraid actually resolves a field.** Two behaviours were measured by hand and are
+  encoded in `check-template.mjs` (a non-empty element text wins over `Default`; `Mask`
+  only affects the GUI);
+- **whether the CA feed picked the change up** — that is the feed, not this repository.
 
-## 4. Point the template at your namespace
+## 5. Community Applications is the last step
 
-`templates/dsh.xml` in the repository keeps the `__GHCR_OWNER__` / `__REPO__` / `__IMAGE_TAG__` placeholders, which avoids hardcoding and makes forking easier; but **CA parses the concrete file in the repository**, so render it once and commit that before submitting to CA (this repository is currently rendered for `2220545672`):
-
-```bash
-node scripts/render-template.mjs --owner=<your-username> --repo=dsh-unraid --tag=latest --out=templates/dsh.xml
-node scripts/check-template.mjs templates/dsh.xml     # self-check before committing
-git add templates/dsh.xml && git commit -m "chore: render template for <owner>" && git push
-```
-
-The icon is already committed at `templates/img/dsh.png`. Changing its style requires installing `sharp` first:
-
-```bash
-pnpm add -D sharp && node scripts/make-icon.mjs --out=templates/img/dsh.png
-node scripts/make-icon.mjs --flatten='#f4f4f6' --out=/tmp/preview-light.png   # see how it looks on a light card
-```
-
-Sources and the trademark note are in `templates/img/src/README.md`.
-
-## 5. CA is the last step
-
-Only once the image, the template and automatic version tracking all work does Community Applications come into play: see [ca-submission.md](ca-submission.md) (hard requirements, the Validate/Scan flow) and [ca-pitfalls.md](ca-pitfalls.md) (real cases that get delisted or deprecated).
+Only once the image pulls, the template installs and the sandbox works does the
+submission flow come into play: [ca-submission.md](ca-submission.md) (the bar and the
+process) and [ca-pitfalls.md](ca-pitfalls.md) (real cases of delisting, deprecation and
+template changes that never flowed back).

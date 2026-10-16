@@ -35,17 +35,18 @@ node scripts/check-template.mjs templates/dsh.xml
 docker pull ghcr.io/<owner>/dsh:latest
 
 # 3. 模板装得起来
-#    Unraid: Docker → Add Container → 粘贴 templates/dsh.xml 内容（或导入 release 资产里的 dsh.xml）
+#    Unraid: Docker → Add Container → 粘贴 templates/dsh.xml 内容（或直接导入这个文件）
 #    装完确认：Web UI 打得开、/data 与 /workspace 持久化、
-#             在 DSH 里跑一条命令不报 SANDBOX_UNAVAILABLE（沙箱可用，见 unraid-sandbox.md）
+#             在 DSH 里跑一条命令不报 SANDBOX_UNAVAILABLE（沙箱可用，见
+#             https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.zh-CN.md）
 ```
 
 ## 三、开论坛支持帖（CA 对自维护容器的要求）
 
 CA 与模板指南都要求：**你自己维护的容器必须有 Unraid 论坛支持帖**，`<Support>` 要指向它，而不是 GitHub Issues。支持帖里至少写清：
 
-- 这个应用是什么、镜像在哪、如何升级（本仓库是自动跟版，用户只需 force update）；
-- **为什么需要那两个 `--security-opt`**（Unraid 内核无 Landlock → bubblewrap 是唯一可用的沙箱层级；见 [unraid-sandbox.md](unraid-sandbox.zh-CN.md)）——这是审核者与用户最可能追问的一点；
+- 这个应用是什么、镜像在哪、如何升级（[2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) 自动跟版，用户只需 force update）；
+- **为什么需要那两个 `--security-opt`**（Unraid 内核无 Landlock → bubblewrap 是唯一可用的沙箱层级；见 [dsh-docker 的 docs/sandbox.zh-CN.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.zh-CN.md)）——这是审核者与用户最可能追问的一点；
 - 已知限制（上游仍是预发布，`:latest` 跟随最新版；内置口令门禁没有 2FA/审计，需要这些就把 `AUTH_MODE` 设为 `none` 交给 SSO）；
 - **默认安全**：不配任何东西时装出来也是带口令的（`AUTH_MODE=builtin` + 首启生成口令打印一次），不会出现"装完就是一台无认证的可执行命令 Web UI"；CA 审核问起时这就是答案。
 - 排障入口（`/healthz`、容器日志里 entrypoint 的前几行会写明模式与启动结果）。

@@ -28,7 +28,7 @@ Unraid `Docker → Add Container` → 导入 `templates/dsh.xml`，然后按需�
 | `/data` | 旧的数据目录 | 免搬数据；空目录也可以在，首次启动会自动初始化 |
 | `/workspace` | 旧的工作区目录 | 同上 |
 | `PUBLIC_URL` | `https://<your.domain>` | 走 edge 模式（前置反代 + 鉴权）；纯内网可留空 |
-| Extra Parameters | **保持默认**（两个 `--security-opt`） | 否则 bash 工具在 Unraid 上不可用，见 [unraid-sandbox.md](unraid-sandbox.zh-CN.md) |
+| Extra Parameters | **保持默认**（两个 `--security-opt`） | 否则 bash 工具在 Unraid 上不可用，见 [dsh-docker 的 docs/sandbox.zh-CN.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.zh-CN.md) |
 
 ### 2. 验证
 
