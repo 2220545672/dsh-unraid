@@ -94,7 +94,9 @@ The "prove repository ownership" step requires you to place a `.unraid/community
 
 ## 6. Afterwards, on every upstream release
 
-`.github/workflows/release.yml` checks npm every day for the highest version of `@deepseek-ai/dsh` (including alpha/rc); when there is a new version it builds, smoke-tests and pushes the image, and generates a **version-locked** template XML as a release asset. What users see in CA is always `:latest`; anyone who wants reproducibility can use the locked-version template from the release assets.
+Since the 2026-10-16 split, that pipeline lives in [2220545672/dsh-docker](https://github.com/2220545672/dsh-docker): its `release.yml` checks npm hourly for the highest version of `@deepseek-ai/dsh` (including alpha/rc), and when there is a new version it builds, smoke-tests and pushes the image, then publishes a Release with the notes. It no longer generates a template asset — the template is here and always installs `:latest`, and a user who wants reproducibility edits the **Repository** field to a version tag instead.
+
+Nothing in this repository has to change for an upstream release, which is the point of the split.
 
 ## Icon hosting: why not to use a raw link
 

@@ -94,7 +94,9 @@ CA 与模板指南都要求：**你自己维护的容器必须有 Unraid 论坛�
 
 ## 六、之后每次上游发版
 
-`.github/workflows/release.yml` 每天检查 npm 上 `@deepseek-ai/dsh` 的最高版本（含 alpha/rc），有新版本就构建、冒烟、推送镜像，并生成**版本锁定**的模板 XML 作为 release 资产。CA 里用户看到的始终是 `:latest`；要可复现的人可以用 release 资产里的锁定版本模板。
+2026-10-16 拆分之后，那条流水线在 [2220545672/dsh-docker](https://github.com/2220545672/dsh-docker)：它的 `release.yml` 每小时检查 npm 上 `@deepseek-ai/dsh` 的最高版本（含 alpha/rc），有新版本就构建、冒烟、推送镜像，并发一个带发布说明的 Release。它**不再**生成模板资产——模板在这里，装的始终是 `:latest`；要可复现的人把 **Repository** 字段改成版本 tag 即可。
+
+**上游发版不需要本仓库做任何事**，这正是拆分的目的。
 
 ## 图标宿主：为什么不用 raw 链接
 
