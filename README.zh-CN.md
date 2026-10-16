@@ -63,6 +63,12 @@ docker run -d --name dsh --restart unless-stopped -p 8080:8080 \
 - **以非特权身份运行。** uid 1000、不挂 docker socket、除你映射的两个卷之外不碰任何宿主目录。凭据存在 `/data`——这就是那个卷必须持久化的原因。
 - **明文 HTTP 上的口令在公网上不安全。** 门禁保护的是应用而不是链路：对外暴露前，请在它前面终止 TLS。
 
+## 用 DeepSeek 账号登录
+
+上游会把**你此刻打开界面的地址**交给 DeepSeek 平台，让平台把登录结果送回那里——而平台只接受*本机*地址。于是从局域网、Tailscale 或反向代理后面点「用 DeepSeek 账号登录」，在登录页打开之前就失败了（提示「操作未完成，请重试。」），变通办法一直是改用 API Key 或每次开 `ssh -L` 隧道。
+
+本镜像集成了 **[dsh-remote-signin](https://github.com/2220545672/dsh-remote-signin)**——插件有独立仓库、独立 CI 与独立发版，镜像只钉住其中一个 tag——它会向平台注册一个 `127.0.0.1` 地址，并在有登录等待时把粘贴框放进 DSH 页面。你点「登录账号」，登录页照常打开；当标签页停在打不开的 `127.0.0.1` 页面时，把那个地址粘进已经自动出现的框里即可。**只多这一步**；把 `REMOTE_SIGNIN` 设为 `off`（见[设置](#设置你可能需要的)）就回到上游行为。原理与它刻意不动的东西见 [docs/remote-signin.zh-CN.md](docs/remote-signin.zh-CN.md)。
+
 ## 更新
 
 Unraid：**Docker → 你的容器 → force update**（或点「apply update」提示）。`/data` 与 `/workspace` 里的东西都不会动。

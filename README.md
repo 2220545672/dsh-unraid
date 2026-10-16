@@ -63,6 +63,23 @@ browser ──▶ :8080  Caddy (bundled)  ──▶ 127.0.0.1:3080  DSH
 - **It runs unprivileged.** uid 1000, no docker socket, no host directories beyond the two volumes you map. Credentials are stored in `/data` — the reason that volume must be persistent.
 - **A password over plain HTTP is not safe on the internet.** The gate protects the app, not the wire: terminate TLS in whatever you put in front before exposing this.
 
+## Signing in with a DeepSeek account
+
+Upstream hands the platform the address **you are browsing from** and asks it to deliver
+the login there — and the platform only accepts a *local* one. So pressing *Sign in* with
+a DeepSeek account from the LAN, from Tailscale or through a proxy fails before a login
+page ever opens ("Could not complete the operation. Try again."), and the workarounds are
+an API key or an `ssh -L` tunnel.
+
+This image ships **[dsh-remote-signin](https://github.com/2220545672/dsh-remote-signin)**
+— the plugin has its own repository, its own CI and its own release tags, and the image
+pins one of those tags — which registers a `127.0.0.1` address with the platform and puts
+a paste box into the DSH page while a sign-in waits. You press *Sign in*, the login page
+opens, and when the tab lands on the dead `127.0.0.1` page you paste that address into
+the box that has appeared. That paste is the only step it adds; `REMOTE_SIGNIN=off`
+(see [Settings](#settings-you-may-need)) gives you upstream behaviour back. How it works
+and what it deliberately leaves alone: [docs/remote-signin.md](docs/remote-signin.md).
+
 ## Update
 
 Unraid: **Docker → your container → force update** (or click the "apply update" hint). Everything in `/data` and `/workspace` survives.

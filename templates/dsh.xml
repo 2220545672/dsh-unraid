@@ -13,7 +13,7 @@
   <ExtraSearchTerms>deepseek harness dsh coding agent ai agent cli</ExtraSearchTerms>
   <Requires>Docker；请保留模板自带的 Extra Parameters（两个 --security-opt），否则命令沙箱不可用 | Docker; keep the template's Extra Parameters or the command sandbox is unavailable</Requires>
   <Changes>跟随上游 @deepseek-ai/dsh 自动重建：每次发布见 Releases 页 | Rebuilt automatically for each upstream release; see the Releases page</Changes>
-  <Overview>DSH（DeepSeek Harness）是开源 AI 编码智能体：在浏览器里与它协作，读写你的项目、执行命令、管理模型与会话历史。本镜像为 Unraid 准备——自动跟随上游发版重建，并内置命令沙箱所需的 bubblewrap，使它在没有 Landlock 的内核上也能正常执行命令。 容器内置 Caddy 反向代理与可选口令门禁（也可设为 none 交给你现有的 SSO），以 uid 1000 非特权运行。⚠️ 上游处于开发者预览阶段，未来会出现破坏兼容性的变更。 | DSH (DeepSeek Harness) is an open-source AI coding agent you drive from the browser: it works on your projects, runs commands and keeps your session history. Built for Unraid — rebuilt automatically for every upstream release, with the bubblewrap sandbox bundled so commands work even on kernels without Landlock. The container bundles its own reverse proxy and an optional password gate (or set none and delegate to your SSO), and runs unprivileged as uid 1000. ⚠️ Upstream is in developer preview: compatibility-breaking changes are coming.</Overview>
+  <Overview>DSH（DeepSeek Harness）是开源 AI 编码智能体：在浏览器里与它协作，读写你的项目、执行命令、管理模型与会话历史。本镜像为 Unraid 准备——自动跟随上游发版重建，内置命令沙箱所需的 bubblewrap，使它在没有 Landlock 的内核上也能正常执行命令，并集成 [dsh-remote-signin](https://github.com/2220545672/dsh-remote-signin) 插件：在局域网、Tailscale 或反向代理后面，用 DeepSeek 账号登录也能正常走完（只在最后多一步粘贴，粘贴框会自己出现在页面上）。 容器内置 Caddy 反向代理与可选口令门禁（也可设为 none 交给你现有的 SSO），以 uid 1000 非特权运行。⚠️ 上游处于开发者预览阶段，未来会出现破坏兼容性的变更。 | DSH (DeepSeek Harness) is an open-source AI coding agent you drive from the browser: it works on your projects, runs commands and keeps your session history. Built for Unraid — rebuilt automatically for every upstream release, with the bubblewrap sandbox bundled so commands work even on kernels without Landlock, and with the [dsh-remote-signin](https://github.com/2220545672/dsh-remote-signin) plugin integrated: a DeepSeek account sign-in also works over the LAN, Tailscale or behind a reverse proxy (it adds one paste, into a box that appears in the page). The container bundles its own reverse proxy and an optional password gate (or set none and delegate to your SSO), and runs unprivileged as uid 1000. ⚠️ Upstream is in developer preview: compatibility-breaking changes are coming.</Overview>
   <Category>Tools:</Category>
   <WebUI>http://[IP]:[PORT:8080]</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/2220545672/dsh-unraid/main/templates/dsh.xml</TemplateURL>
@@ -42,7 +42,7 @@
 
 模型凭据在应用界面里配置，本模板不要求填写任何密钥。
 
-**用 DeepSeek 账号登录（而非 API Key）**：登录标签页最后会停在一个打不开的 `127.0.0.1` 页面上——这是上游的限制（平台只允许登录结果回到回环地址）。这时 DSH 页面右下角会**自动出现粘贴框**，把那个页面的地址复制进去即可完成登录（粘贴框会自动出现在页面右下角）；把本模板的 **Remote sign-in** 设为 off 可回到上游「只有回环地址下的浏览器能登录」的行为。仓库文档：docs/remote-signin.md。
+**用 DeepSeek 账号登录（而非 API Key）**：登录标签页最后会停在一个打不开的 `127.0.0.1` 页面上——这是上游的限制（平台只允许登录结果回到回环地址）。这时 DSH 页面右下角会**自动出现粘贴框**，把那个页面的地址复制进去即可完成登录；把本模板的 **Remote sign-in** 设为 off 可回到上游「只有回环地址下的浏览器能登录」的行为。仓库文档：docs/remote-signin.md。
 
 **页面提示 “dsh web authentication required”**：通常**自动**恢复（DSH 对文档请求回 401 时会被自动引到 `/renew` 重放启动 token，只绕一次、不会成环）；也可手动打开 `http://&lt;你的地址&gt;:&lt;端口&gt;/renew`，或清掉该站点的 Cookie。
 **排障**
