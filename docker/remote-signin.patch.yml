@@ -1,0 +1,22 @@
+# The launcher patch layer this image passes with `--patch` while REMOTE_SIGNIN=on.
+#
+# Why an absolute file URL instead of the plugin's own cordis.patch.yml (which names
+# the package): the launcher resolves an entry's `name` from two anchors — the packages
+# carried by the dsh *installation* (`@deepseek-ai/dsh` and its dependency closure) and
+# the *profile* directory (`$DSH_HOME/profiles/<name>/node_modules`). A plugin that the
+# image installs into /app/node_modules is in neither: it is a dependency of this
+# image's runtime manifest, not of @deepseek-ai/dsh, and the profile lives on the
+# operator's volume where the image must not install anything (measured 2026-10-16:
+# `name: dsh-remote-signin` fails with ERR_MODULE_NOT_FOUND imported from
+# /data/dsh/profiles/web/). An absolute path bypasses both anchors, which keeps the
+# plugin's location an image concern and the resolution a launcher concern.
+#
+# The plugin's own cordis.patch.yml is still what loads it when someone installs the
+# package *into* a profile (`dsh plugin --profile web add github:…`), because then the
+# profile anchor does resolve the name. Two patch files, one entry each, on purpose.
+#
+# `insert:` is required: a bare row targets an existing entry by id, and the loader
+# would warn "entry not found" and carry on — a silent way to load nothing at all.
+- insert:
+    - id: remote-signin
+      name: file:///app/node_modules/dsh-remote-signin/src/index.js

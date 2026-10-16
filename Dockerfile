@@ -135,9 +135,15 @@ COPY --from=deps /app /app
 COPY --from=caddy /usr/local/bin/caddy /usr/local/bin/caddy
 COPY docker/entrypoint.sh docker/healthcheck.sh /usr/local/bin/
 COPY docker/Caddyfile.edge docker/Caddyfile.lan /etc/caddy/
+# The patch layer that loads the remote sign-in plugin while REMOTE_SIGNIN=on. It
+# names the plugin by absolute path because the launcher resolves entry names from the
+# installation and the profile, and neither holds a plugin this image installs — see
+# the file itself.
+COPY docker/remote-signin.patch.yml /etc/dsh/remote-signin.patch.yml
 
 RUN set -eux; \
     chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh /usr/local/bin/caddy; \
+    chmod 0644 /etc/dsh/remote-signin.patch.yml; \
     printf '#!/bin/sh\nexec node /app/node_modules/@deepseek-ai/dsh/lib/bin.js "$@"\n' > /usr/local/bin/dsh; \
     chmod 0755 /usr/local/bin/dsh; \
     npm install --global --no-audit --no-fund pnpm@10; \

@@ -68,14 +68,15 @@ PUBLIC_URL="${PUBLIC_URL:-}"
 # the authorization code.
 #
 # The plugin is github.com/2220545672/dsh-remote-signin, installed by the Dockerfile
-# and maintained there; this image only decides whether to load it and with which
-# claim. Its `cordis.patch.yml` names the entry, so the launcher needs no knowledge of
-# the plugin's internals.
+# and maintained there; this image only decides whether to load it and with which claim.
+# It is loaded through this image's own patch file, by absolute path: the launcher
+# resolves entry names from the installation and the profile, and a plugin the image
+# installs is in neither (the patch file itself explains the measurement).
 REMOTE_SIGNIN="${REMOTE_SIGNIN:-on}"
 REMOTE_SIGNIN_ORIGIN="${REMOTE_SIGNIN_ORIGIN:-}"
 REMOTE_SIGNIN_DEFAULT_ORIGIN="http://127.0.0.1:47821"
 REMOTE_SIGNIN_DIR="/app/node_modules/dsh-remote-signin"
-REMOTE_SIGNIN_PATCH="${REMOTE_SIGNIN_DIR}/cordis.patch.yml"
+REMOTE_SIGNIN_PATCH="/etc/dsh/remote-signin.patch.yml"
 REMOTE_SIGNIN_MODULE="${REMOTE_SIGNIN_DIR}/src/index.js"
 REMOTE_SIGNIN_ACTIVE=0
 

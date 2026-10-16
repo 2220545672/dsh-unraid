@@ -375,8 +375,12 @@ else
     fail "/remote-signin/inpage.js answered ${PANEL_CODE} without the panel markup"
 fi
 # The document itself is the other half of "automatic": without this row injected, the
-# panel never runs and the operator is back to finding /remote-login by hand.
-INDEX_HTML="$(curl --silent --location --max-time 10 "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/" || true)"
+# panel never runs and the operator is back to finding /remote-login by hand. The cookie
+# jar matters: the first request answers 303 with a launch token, and the request that
+# follows it needs the DSH session cookie that response set.
+INDEX_JAR="${WORKDIR}/index-cookies.txt"
+INDEX_HTML="$(curl --silent --location --max-time 10 --cookie-jar "${INDEX_JAR}" --cookie "${INDEX_JAR}" \
+    "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/" || true)"
 if grep --quiet -- 'remote-signin/inpage.js' <<< "${INDEX_HTML}"; then
     pass 'the DSH document carries the injected panel script'
 else
