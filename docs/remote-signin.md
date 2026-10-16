@@ -125,16 +125,19 @@ Two halves, both in the image:
 4. The dialog in the original tab switches to signed in, and the login tab closes
    itself.
 
-`docker logs <container> | head -30` prints the exact bridge URL, and one line from the
+`docker logs <container> | head -30` prints the bridge address, and one line from the
 overlay when it loaded:
 
 ```
-[entrypoint] remote sign-in: account sign-in works from a remote browser — the login tab
-             will end on a dead http://127.0.0.1:47821 page, paste that address at
-             https://dsh.example.com/remote-login
+[entrypoint] remote sign-in: on — a remote browser finishes the sign-in at
+             https://dsh.example.com/remote-login, by pasting the address of the dead
+             http://127.0.0.1:47821 page there
 [remote-signin] active — a remote browser signs in through the loopback claim
              http://127.0.0.1:47821 (reached via the accessor); finish it at /remote-login
 ```
+
+(Without `PUBLIC_URL` the entrypoint cannot know which host port you published, so it
+names the path and your own port instead of guessing.)
 
 ### The seamless alternative (no paste)
 

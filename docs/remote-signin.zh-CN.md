@@ -82,15 +82,17 @@
 3. 用你打开界面的同一个地址访问 **`/remote-login`**（`https://dsh.meix.top/remote-login`、`http://192.168.3.2:8080/remote-login` 等），粘贴地址，点 **继续**。
 4. 原来那个标签页里的对话框会变成已登录，登录标签页会自己关闭。
 
-`docker logs <容器名> | head -30` 会打印出确切的桥地址，以及 overlay 加载成功的那一行：
+`docker logs <容器名> | head -30` 会打印出桥的地址，以及 overlay 加载成功的那一行：
 
 ```
-[entrypoint] remote sign-in: account sign-in works from a remote browser — the login tab
-             will end on a dead http://127.0.0.1:47821 page, paste that address at
-             https://dsh.example.com/remote-login
+[entrypoint] remote sign-in: on — a remote browser finishes the sign-in at
+             https://dsh.example.com/remote-login, by pasting the address of the dead
+             http://127.0.0.1:47821 page there
 [remote-signin] active — a remote browser signs in through the loopback claim
              http://127.0.0.1:47821 (reached via the accessor); finish it at /remote-login
 ```
+
+（没设 `PUBLIC_URL` 时容器无从知道你发布的宿主端口，所以那一行只给路径和"你自己的端口"，不做猜测。）
 
 ### 无缝替代方案（不用粘贴）
 

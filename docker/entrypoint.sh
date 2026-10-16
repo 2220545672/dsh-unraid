@@ -486,9 +486,15 @@ fi
 : > "${DSH_STARTUP_LOG}"
 log "starting DeepSeek Harness ${DSH_VERSION:-unknown} on 127.0.0.1:${DSH_INTERNAL_PORT} (mode=${MODE})"
 if (( REMOTE_SIGNIN_ACTIVE == 1 )); then
-    bridge_url="http://<this-host>:${PORT}/remote-login"
-    [[ -z "${PUBLIC_ORIGIN}" ]] || bridge_url="${PUBLIC_ORIGIN}/remote-login"
-    log "remote sign-in: account sign-in works from a remote browser — the login tab will end on a dead ${REMOTE_SIGNIN_ORIGIN} page, paste that address at ${bridge_url}"
+    # The published port is not knowable from inside the container — PORT is the
+    # container-side listener, and printing it as if it were the host port would send
+    # the operator to whatever else answers on 8080. In edge mode PUBLIC_URL carries
+    # the real address; in lan mode the hint names the path and their own port.
+    if [[ -n "${PUBLIC_ORIGIN}" ]]; then
+        log "remote sign-in: on — a remote browser finishes the sign-in at ${PUBLIC_ORIGIN}/remote-login, by pasting the address of the dead ${REMOTE_SIGNIN_ORIGIN} page there"
+    else
+        log "remote sign-in: on — a remote browser finishes the sign-in at /remote-login on the address this UI is opened with (e.g. http://<this-host>:<published-port>/remote-login), by pasting the address of the dead ${REMOTE_SIGNIN_ORIGIN} page there"
+    fi
 else
     log "remote sign-in: off — account sign-in needs a browser on this machine (or an ssh -L tunnel); an API key works from anywhere"
 fi
