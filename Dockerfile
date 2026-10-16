@@ -30,13 +30,21 @@ ARG DSH_VERSION
 # (github.com/2220545672/dsh-remote-signin). It is pinned to a tag on purpose: a build
 # of this image must get the plugin version this Dockerfile was tested with, and the
 # plugin's own CI is what validates it.
+#
+# The spec is spelled out as git+https, and ssh is rewritten to https for the whole
+# build, because images have no keys: measured 2026-10-16, npm resolved the equivalent
+# "github:2220545672/dsh-remote-signin#tag" shorthand to ssh://git@github.com and the
+# build died with "Permission denied (publickey)" — while the same shorthand in a
+# throwaway container that had a working ssh agent picked https and succeeded. A tag
+# is a release of a public repository; nothing here should depend on a key.
 ARG REMOTE_SIGNIN_VERSION=v0.2.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR /app
 
 RUN set -eux; \
     test -n "${DSH_VERSION}"; \
-    printf '{\n  "name": "dsh-runtime",\n  "private": true,\n  "dependencies": { "@deepseek-ai/dsh": "%s", "dsh-remote-signin": "github:2220545672/dsh-remote-signin#%s" }\n}\n' "${DSH_VERSION}" "${REMOTE_SIGNIN_VERSION}" > package.json; \
+    printf '{\n  "name": "dsh-runtime",\n  "private": true,\n  "dependencies": { "@deepseek-ai/dsh": "%s", "dsh-remote-signin": "git+https://github.com/2220545672/dsh-remote-signin.git#%s" }\n}\n' "${DSH_VERSION}" "${REMOTE_SIGNIN_VERSION}" > package.json; \
+    git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"; \
     npm install --omit=dev --no-audit --no-fund --loglevel=warn; \
     node -e 'const want = process.env.DSH_VERSION; const got = require("/app/node_modules/@deepseek-ai/dsh/package.json").version; if (got !== want) { console.error(`resolved ${got}, expected ${want}`); process.exit(1); }'; \
     node -e 'const p = require("/app/node_modules/dsh-remote-signin/package.json"); require("node:fs").accessSync("/app/node_modules/dsh-remote-signin/cordis.patch.yml"); console.log(`remote-signin plugin ${p.version}`);'; \
