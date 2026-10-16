@@ -6,6 +6,16 @@
 > Tailscale or through a reverse proxy — where upstream's sign-in cannot work at all.
 > Set `REMOTE_SIGNIN=off` to get upstream's behaviour back.
 
+## What you would see without this
+
+You open the UI from another machine, press **Sign in** with a DeepSeek account, and no
+login page appears — the dialog fails instead, with the account panel's own wording
+("Could not complete the operation. Try again.", or its network-problem variant). The
+same click works from a browser on this machine, or through an `ssh -L` tunnel, and an
+API key is unaffected. With `REMOTE_SIGNIN=on` the login page opens as usual; the only
+step it adds is pasting the dead `127.0.0.1` address into a panel that appears in the
+page by itself.
+
 ## The problem, measured
 
 Upstream gives the platform the **browser's own origin** as the OAuth `redirect_uri`,
