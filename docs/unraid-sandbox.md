@@ -82,6 +82,13 @@ ssh unraid 'docker run --rm \
 
 Verifying inside DSH (the most direct way): just have it run any command, for example "run `pwd` and list the current directory". If the sandbox is unavailable you will see the `SANDBOX_UNAVAILABLE` error above; when it is available the command returns straight away.
 
+Two things to know before you check by hand, because both have produced false reports:
+
+* **Run the test as uid 1000, never as root.** `docker exec` defaults to root, and root inside the container has no `CAP_SYS_ADMIN`, so bwrap always fails there with `Creating new namespace failed: Operation not permitted`. DSH itself runs as uid 1000 (`docker top <container> -o user,args`), where bwrap works. DSH's own readiness probe is exactly `bwrap --ro-bind / / --dev /dev --unshare-pid --proc /proc --die-with-parent -- true` (read-only policy) — exit 0 means DSH will pick bwrap with full enforcement.
+* **`systempaths=unconfined` is invisible in `docker inspect`.** It does not appear in `HostConfig.SecurityOpt` (only `seccomp=unconfined` does); its effect is that `MaskedPaths` and `ReadonlyPaths` are empty arrays. If they are `null`, the flag really is missing.
+
+Neither `--cap-add SYS_ADMIN` nor `--privileged` is needed — they only make bwrap work *as root*, which DSH never does, and both weaken the container.
+
 ## References
 
 - Sandbox chain and failure modes: [`runzhliu/deepseek-harness-docker` #35](https://github.com/runzhliu/deepseek-harness-docker/issues/35) (measured on Unraid 7.3.2)

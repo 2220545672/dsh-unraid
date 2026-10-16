@@ -86,7 +86,7 @@ Unraid：**Docker → 你的容器 → force update**（或点「apply update」
 | 现象 | 处理 |
 |---|---|
 | 页面提示 “dsh web authentication required; reopen the URL printed by dsh web” | **刷新页面即可。** 这是浏览器持有一个 DSH 已不再接受的会话 Cookie（镜像更新、容器重建、或同主机另一个 DSH 实例都会造成——Cookie 不区分端口）。容器自己会发现并重新签发会话；手动打开 `http://<主机>:<端口>/renew`、或清掉该站点 Cookie，效果相同。 |
-| 工具报 `SANDBOX_UNAVAILABLE` | **Extra Parameters** 里的两个 `--security-opt` 被删了，补回去。 |
+| 工具报 `SANDBOX_UNAVAILABLE` | **Extra Parameters** 里的两个 `--security-opt` 被删了，补回去。自查时有两个坑：`systempaths=unconfined` **不会**出现在 `docker inspect` 的 `SecurityOpt` 里（它表现为 `MaskedPaths`/`ReadonlyPaths` 变空），而 bwrap **只在 uid 1000 下可用** —— DSH 正是以 uid 1000 跑的。所以要按 DSH 的方式测：`docker exec -u 1000 <容器> bwrap --ro-bind / / --dev /dev --unshare-pid --proc /proc --die-with-parent -- true` → exit 0。用 root（`docker exec` 默认身份）测必然报 *Creating new namespace failed*，那不能说明容器有问题；`--cap-add SYS_ADMIN` 与 `--privileged` 都不需要，而且都会削弱容器隔离。 |
 | 浏览器拿到 `403` | 你的地址不在 `ALLOWED_CLIENTS` 里；裸 `docker run` 默认只放行回环。 |
 | 用 DeepSeek 账号登录报「登录失败 / 操作未完成」 | 上游只接受**回环**来源，于是登录标签页被重定向到 `127.0.0.1` 后死在那里。**这一步正是插件负责收尾的：**那时 DSH 页面里已经自动出现粘贴面板——把那个打不开页面的地址粘进去。请**在约 10 分钟内、同一个容器里**完成（更新或重建容器都会作废这次尝试）。面板会把服务器的回答显示出来，所以过期会明确告诉你是过期，而不是丢一个空白 404 给你。面板若没出现，就是插件没加载：把 `REMOTE_SIGNIN` 设为 `on`（本来就是默认值），并用 `docker logs <容器名> | grep remote-signin` 看原因。不想粘贴？开一次隧道用回环地址登录：`ssh -L 3081:127.0.0.1:<发布端口> root@<服务器>` 后打开 `http://127.0.0.1:3081`。 |
 | 更新了却没变化 | Unraid 只在镜像 digest 变化时重建容器——用 **force update**。 |
