@@ -60,17 +60,23 @@ DSH_TRUSTED_HOSTS="${DSH_TRUSTED_HOSTS:-}"
 PUBLIC_URL="${PUBLIC_URL:-}"
 # Remote sign-in (see docs/remote-signin.md). The DeepSeek platform only returns a
 # browser sign-in to a loopback address, so a browser that is not on this machine
-# cannot sign in with an account at all. `on` (the default) loads the overlay that
-# claims such an address and serves the bridge page that finishes the flow; `off`
+# cannot sign in with an account at all. `on` (the default) loads the plugin that
+# claims such an address and puts the paste step into the DSH page itself; `off`
 # keeps upstream behaviour bit-for-bit. The claim is a loopback origin *string*
 # nothing ever listens on: any port works, and a port unlikely to be occupied on
 # the operator's own machine is chosen so a stray local service can never receive
 # the authorization code.
+#
+# The plugin is github.com/2220545672/dsh-remote-signin, installed by the Dockerfile
+# and maintained there; this image only decides whether to load it and with which
+# claim. Its `cordis.patch.yml` names the entry, so the launcher needs no knowledge of
+# the plugin's internals.
 REMOTE_SIGNIN="${REMOTE_SIGNIN:-on}"
 REMOTE_SIGNIN_ORIGIN="${REMOTE_SIGNIN_ORIGIN:-}"
 REMOTE_SIGNIN_DEFAULT_ORIGIN="http://127.0.0.1:47821"
-REMOTE_SIGNIN_DIR="/etc/dsh/remote-signin"
-REMOTE_SIGNIN_PATCH="${REMOTE_SIGNIN_DIR}/patch.yml"
+REMOTE_SIGNIN_DIR="/app/node_modules/dsh-remote-signin"
+REMOTE_SIGNIN_PATCH="${REMOTE_SIGNIN_DIR}/cordis.patch.yml"
+REMOTE_SIGNIN_MODULE="${REMOTE_SIGNIN_DIR}/src/index.js"
 REMOTE_SIGNIN_ACTIVE=0
 
 CADDY_DIR="/etc/caddy"
@@ -230,7 +236,7 @@ esac
 
 case "${REMOTE_SIGNIN}" in
     on|off) ;;
-    *) fatal "REMOTE_SIGNIN='${REMOTE_SIGNIN}' is not supported (use 'on' to serve the /remote-login bridge, or 'off' for upstream's loopback-only sign-in)" ;;
+    *) fatal "REMOTE_SIGNIN='${REMOTE_SIGNIN}' is not supported (use 'on' to load the remote sign-in plugin, or 'off' for upstream's loopback-only sign-in)" ;;
 esac
 
 if [[ "${REMOTE_SIGNIN}" == "on" ]]; then
@@ -242,13 +248,13 @@ if [[ "${REMOTE_SIGNIN}" == "on" ]]; then
     (( 10#${remote_signin_port} >= 1 && 10#${remote_signin_port} <= 65535 )) \
         || fatal "REMOTE_SIGNIN_ORIGIN has an out-of-range port: ${REMOTE_SIGNIN_ORIGIN}"
 
-    # The overlay is optional by construction: a broken or unreadable one must never
-    # be the reason an agent will not start, so every problem here only disables the
-    # feature (loudly) and leaves upstream's behaviour in place.
-    if [[ ! -r "${REMOTE_SIGNIN_PATCH}" || ! -r "${REMOTE_SIGNIN_DIR}/dsh-remote-signin.mjs" ]]; then
-        warn "REMOTE_SIGNIN=on but ${REMOTE_SIGNIN_DIR} is incomplete; account sign-in stays loopback-only"
-    elif ! node --check "${REMOTE_SIGNIN_DIR}/dsh-remote-signin.mjs" >/dev/null 2>&1; then
-        warn "the remote sign-in overlay does not parse; account sign-in stays loopback-only"
+    # The plugin is optional by construction: a missing or unreadable one must never be
+    # the reason an agent will not start, so every problem here only disables the feature
+    # (loudly) and leaves upstream's behaviour in place.
+    if [[ ! -r "${REMOTE_SIGNIN_PATCH}" || ! -r "${REMOTE_SIGNIN_MODULE}" ]]; then
+        warn "REMOTE_SIGNIN=on but the dsh-remote-signin plugin is not installed at ${REMOTE_SIGNIN_DIR}; account sign-in stays loopback-only"
+    elif ! node --check "${REMOTE_SIGNIN_MODULE}" >/dev/null 2>&1; then
+        warn "the dsh-remote-signin plugin does not parse; account sign-in stays loopback-only"
     else
         REMOTE_SIGNIN_ACTIVE=1
     fi
@@ -486,14 +492,13 @@ fi
 : > "${DSH_STARTUP_LOG}"
 log "starting DeepSeek Harness ${DSH_VERSION:-unknown} on 127.0.0.1:${DSH_INTERNAL_PORT} (mode=${MODE})"
 if (( REMOTE_SIGNIN_ACTIVE == 1 )); then
-    # The published port is not knowable from inside the container — PORT is the
-    # container-side listener, and printing it as if it were the host port would send
-    # the operator to whatever else answers on 8080. In edge mode PUBLIC_URL carries
-    # the real address; in lan mode the hint names the path and their own port.
+    # The plugin puts the paste box into the DSH page by itself; this line names the
+    # standalone page for the cases where it did not (and the plugin's own "active"
+    # line, printed by DSH, names the claim and the version it loaded).
     if [[ -n "${PUBLIC_ORIGIN}" ]]; then
-        log "remote sign-in: on — a remote browser finishes the sign-in at ${PUBLIC_ORIGIN}/remote-login, by pasting the address of the dead ${REMOTE_SIGNIN_ORIGIN} page there"
+        log "remote sign-in: on — a remote browser finishes the sign-in in the DSH page; the standalone page is ${PUBLIC_ORIGIN}/remote-login"
     else
-        log "remote sign-in: on — a remote browser finishes the sign-in at /remote-login on the address this UI is opened with (e.g. http://<this-host>:<published-port>/remote-login), by pasting the address of the dead ${REMOTE_SIGNIN_ORIGIN} page there"
+        log "remote sign-in: on — a remote browser finishes the sign-in in the DSH page; the standalone page is /remote-login on the address you opened this UI with (e.g. http://<this-host>:<published-port>/remote-login)"
     fi
 else
     log "remote sign-in: off — account sign-in needs a browser on this machine (or an ssh -L tunnel); an API key works from anywhere"

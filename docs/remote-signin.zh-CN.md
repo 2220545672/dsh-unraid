@@ -55,18 +55,20 @@
 6.  登录对话框变成已登录
 ```
 
-镜像里对应两半：
+本镜像安装并钉住的那个[插件](https://github.com/2220545672/dsh-remote-signin)里对应两半：
 
-* **声明（claim）**——`docker/remote-signin/dsh-remote-signin.mjs`，一个 launcher patch overlay（入口脚本只在 `REMOTE_SIGNIN=on` 时用 `--patch` 加载它）。它包住 `deepseekAccount.startSignIn`，把非回环的浏览器 origin 换成 `REMOTE_SIGNIN_ORIGIN`（默认 `http://127.0.0.1:47821`）。本来就在回环上的浏览器原样放行，所以桌面应用和 `ssh -L` 会话的行为与上游完全一致。
-* **桥（bridge）**——`docker/remote-signin/bridge.html`，由内置 Caddy 在 `/remote-login` 提供。它只从你粘贴的地址里取 `code` 和 `state`，然后导航到**你此刻正在使用的这个 origin** 上的 `/oauth/callback`。除此之外不发给任何地方，这个页面也没法被当作跳板。
+* **声明（claim）**——`src/index.js` 包住 `deepseekAccount.startSignIn`，把非回环的浏览器 origin 换成 `REMOTE_SIGNIN_ORIGIN`（默认 `http://127.0.0.1:47821`）。本来就在回环上的浏览器原样放行，所以桌面应用和 `ssh -L` 会话的行为与上游完全一致。
+* **回传路径**——`assets/inpage.js` 被注入 DSH 文档，在有登录等待时把粘贴框放进页面；`assets/bridge.html` 是同样功能的独立页面 `/remote-login`。两者都只从你粘贴的地址里取 `code` 和 `state`，发到**你此刻正在使用的这个 origin** 上的 `/oauth/callback`。除此之外不发给任何地方，两者也没法被当作跳板。
+
+镜像本身只决定**是否**加载插件、以及**用哪个声明**（`REMOTE_SIGNIN`、`REMOTE_SIGNIN_ORIGIN`，以及入口脚本传给 launcher 的 `--patch`）。插件的代码、面板与页面都在它自己的仓库里维护。
 
 ## 它刻意不做的事
 
-* **不放松任何校验。** 结束登录的是本服务器上上游自己的路由，用上游的一次性 `state` 校验和上游的 PKCE verifier。overlay 只决定「注册哪个回环**字符串**作为重定向目标」。
+* **不放松任何校验。** 结束登录的是本服务器上上游自己的路由，用上游的一次性 `state` 校验和上游的 PKCE verifier。插件只决定「注册哪个回环**字符串**作为重定向目标」。
 * **不改动已经处于回环的浏览器。** 隧道 / 桌面应用那条路径没有任何行为变化，不需要重新验证、也没有新的风险。
 * **不保存、不打印 code / state / token。** 它每次尝试只写一行日志：本次声明用的 origin。
 * **不开放任何端口。** 声明只是一个字符串：服务器和你本机都没有任何东西监听 `127.0.0.1:47821`。
-* **绝不会成为容器起不来的原因。** overlay 缺失、语法错误，或将来上游改了账号服务的名字，容器都只会退回上游行为并在日志里留一行。
+* **绝不会成为容器起不来的原因。** 插件缺失、资源读不到、语法错误，或将来上游改名，容器都只会退回上游行为并在日志里留一行。
 
 ## 安全说明
 
@@ -77,60 +79,66 @@
 
 ## 使用步骤
 
-1. 在 DSH 界面点 **Sign in** 用 DeepSeek 账号登录。登录页在新标签页打开，在那里完成登录。（**不会自动跳到登录桥**：那个标签页会一直停在"等待登录"，直到你做完第 3 步。）
+1. 在 DSH 界面点 **Sign in** 用 DeepSeek 账号登录。登录页在新标签页打开，在那里完成登录。
 2. 那个标签页随后会停在 `127.0.0.1` 的「无法访问此网站」错误页。**这一步是预期的。** 选中它的地址栏，复制整个地址。
-3. 用你打开界面的同一个地址访问 **`/remote-login`**（`https://dsh.meix.top/remote-login`、`http://192.168.3.2:8080/remote-login` 等），粘贴地址，点 **继续**。页面会把授权码发出去，并把服务器的回答**就地显示**出来——已登录 / 已过期 / "这不是等待中登录的回调地址"——而不是把你带进一个空白错误页。
-4. 原来那个标签页里的对话框会变成已登录，登录标签页会自己关闭。
+3. 回到 DSH 标签页：**右下角已经自己出现了粘贴面板**（只要有一次登录在等待，插件就会把它显示出来）。把地址粘进去，点 **完成登录**。面板会把授权码发出去，并把服务器的回答就地显示：已登录 / 已过期 / "这不是等待中登录的回调地址"。
+4. 那个标签页里的登录对话框会变成已登录，登录标签页会自己关闭。
+
+**不需要跳转、也不需要记住任何地址**——面板就是流程本身。`/remote-login` 提供同样功能的独立页面，用于面板不在的场合（浏览器扩展拦了脚本、页面加载后 `REMOTE_SIGNIN` 被关掉等）；它的地址在启动日志里。
 
 请**在约 10 分钟内、并且针对同一个容器**完成：授权码属于那次登录，随它一起过期；重建容器（更新、改设置）也会把它作废。真超了也不算故障——重新点一次登录即可。
 
-`docker logs <容器名> | head -30` 会打印出桥的地址，以及 overlay 加载成功的那一行：
+`docker logs <容器名> | head -30` 会打印独立页面的地址，插件加载时也会自报声明与自身版本：
 
 ```
-[entrypoint] remote sign-in: on — a remote browser finishes the sign-in at
-             https://dsh.example.com/remote-login, by pasting the address of the dead
-             http://127.0.0.1:47821 page there
-[remote-signin] active — a remote browser signs in through the loopback claim
-             http://127.0.0.1:47821 (reached via the accessor); finish it at /remote-login
+[entrypoint] remote sign-in: on — a remote browser finishes the sign-in in the DSH page;
+             the standalone page is https://dsh.example.com/remote-login
+[remote-signin] active — v0.1.1, claim http://127.0.0.1:47821, panel at
+             /remote-signin/inpage.js, page at /remote-login
 ```
 
 （没设 `PUBLIC_URL` 时容器无从知道你发布的宿主端口，所以那一行只给路径和"你自己的端口"，不做猜测。）
 
 ### 无缝替代方案（不用粘贴）
 
-如果你不想粘贴，就用自己的回环 origin 打开界面——那条路完全是上游流程，不涉及这个桥：
+如果你不想粘贴，就用自己的回环 origin 打开界面——那条路完全是上游流程，不涉及声明、也没有面板：
 
 ```bash
 ssh -N -L 3081:127.0.0.1:3080 root@<服务器>     # 后面这个端口是你把 8080 映射到的那个
 ```
 
-然后用 `http://127.0.0.1:3081` 打开界面并在那里登录。凭据存在服务端，所以这是一次性动作。两条路的终点相同；桥只是为"手边没有隧道"的时刻准备的。
+然后用 `http://127.0.0.1:3081` 打开界面并在那里登录。凭据存在服务端，所以这是一次性动作。两条路的终点相同；面板只是为"手边没有隧道"的时刻准备的。
 
 ## 设置
 
 | 变量 | 默认值 | 含义 |
 |---|---|---|
-| `REMOTE_SIGNIN` | `on` | `on` = 加载 overlay 并提供 `/remote-login`；`off` = 上游的「仅回环」行为。填其它值容器拒绝启动。 |
+| `REMOTE_SIGNIN` | `on` | `on` = 加载[插件](https://github.com/2220545672/dsh-remote-signin)（声明回环 origin、把面板注入页面、提供 `/remote-login`）；`off` = 上游的「仅回环」行为。填其它值容器拒绝启动。 |
 | `REMOTE_SIGNIN_ORIGIN` | `http://127.0.0.1:47821` | 向平台声明的回环 origin。必须是 `http://` + `127.0.0.1` / `localhost` / `[::1]` 之一 + 显式端口；那里不能有任何监听。 |
+
+插件版本由 [Dockerfile](../Dockerfile) 的 `REMOTE_SIGNIN_VERSION` 构建参数钉住（当前 `v0.1.1`）：镜像拿到的是它构建时测试过的那个版本，而插件自身的 CI 负责验证它。
 
 ## 排障
 
 | 现象 | 含义 |
 |---|---|
-| 对话框一直停在 *waiting for browser* | 在你完成第 3 步粘贴之前就是这样；10 分钟后过期。**不会自动跳到 `/remote-login`**，请自己打开（地址在启动日志里）。 |
-| 桥页面说这不是回调地址 | 复制错了标签页，或地址被截断：必须同时含 `code=` 与 `state=`，形如 `http://127.0.0.1:<端口>/oauth/callback?…`。 |
-| 桥页面说**没有正在等待的登录**（`404`） | 这次登录已经没了——页面会把服务器自己的回答显示出来，而不是把你丢在一个空白错误页上。两种常见原因：① 超过约 10 分钟过期；② 它属于**另一个 DSH 实例**——重建/升级容器会作废它，而前一个实例遗留的标签页看上去还停在"等待登录"。请在**你正在用的那个标签页**里重新发起登录。 |
-| 桥页面说 state 不匹配（`400`） | 地址来自另一次尝试，或这个 code 已经被用掉了。重新点一次 **Sign in**。 |
-| 登录标签页显示 DeepSeek 报错而不是登录表单 | overlay 没加载。`docker logs <容器名> \| grep remote-signin` 会说明原因（`off`、overlay 不可读，或 `INACTIVE`）。 |
-| 想回到旧行为 | `REMOTE_SIGNIN=off`，然后重建容器。 |
+| 面板一直不出现 | 插件没加载：`docker logs <容器名> \| grep remote-signin` 会说明原因（`off`、包缺失，或 `INACTIVE`）；`/remote-login` 仍然可以手动粘贴。 |
+| 对话框一直停在 *waiting for browser* | 在你往面板里粘贴之前就是这样；10 分钟后过期。 |
+| 面板说这不是回调地址 | 复制错了标签页，或地址被截断：必须同时含 `code=` 与 `state=`，形如 `http://127.0.0.1:<端口>/oauth/callback?…`。 |
+| 面板（或页面）说**没有正在等待的登录**（`404`） | 这次登录已经没了——面板会把服务器自己的回答显示出来，而不是把你丢在一个空白错误页上。两种常见原因：① 超过约 10 分钟过期；② 它属于**另一个 DSH 实例**——重建/升级容器会作废它，而前一个实例遗留的标签页看上去还停在"等待登录"。请在**你正在用的那个标签页**里重新发起登录。 |
+| 面板说 state 不匹配（`400`） | 地址来自另一次尝试，或这个 code 已经被用掉了。重新点一次 **Sign in**。 |
+| 登录标签页显示 DeepSeek 报错而不是登录表单 | 插件没加载，声明没生效，上游拒了这个 origin。`docker logs <容器名> \| grep remote-signin` 会说明原因。 |
+| 想回到旧行为 | `REMOTE_SIGNIN=off`（或移除插件），然后重建容器。 |
 
 ## 各部件的位置
 
-| 镜像内路径 | 仓库文件 | 作用 |
+| 镜像内路径 | 在哪维护 | 作用 |
 |---|---|---|
-| `/etc/dsh/remote-signin/dsh-remote-signin.mjs` | `docker/remote-signin/dsh-remote-signin.mjs` | overlay：声明回环 origin。 |
-| `/etc/dsh/remote-signin/patch.yml` | `docker/remote-signin/patch.yml` | 加载它的 launcher patch 条目。 |
-| `/etc/caddy/bridge/remote-login.html` | `docker/remote-signin/bridge.html` | `/remote-login` 提供的页面。 |
-| `/etc/caddy/Caddyfile.{edge,lan}` | `docker/Caddyfile.{edge,lan}` | 提供该页面的路由，与界面同处一道门禁之后。 |
+| `/app/node_modules/dsh-remote-signin/src/index.js` | [dsh-remote-signin](https://github.com/2220545672/dsh-remote-signin) → `src/index.js` | 声明、静态资源路由、面板注入。 |
+| `/app/node_modules/dsh-remote-signin/assets/inpage.js` | 同一仓库 → `assets/inpage.js` | 出现在 DSH 页面里的面板。 |
+| `/app/node_modules/dsh-remote-signin/assets/bridge.html` | 同一仓库 → `assets/bridge.html` | `/remote-login` 的独立页面。 |
+| `/app/node_modules/dsh-remote-signin/cordis.patch.yml` | 同一仓库 → `cordis.patch.yml` | 入口脚本用 `--patch` 传入的加载条目。 |
+| `/usr/local/bin/entrypoint.sh` | 本仓库 | 决定是否加载插件、校验 `REMOTE_SIGNIN_ORIGIN`、在日志里给独立页面地址。 |
+| `/etc/caddy/Caddyfile.{edge,lan}` | 本仓库 | 不为插件单独开路由：`/remote-login` 与 `/remote-signin/*` 与其它路径一样走反代，并同样处于门禁之后。 |
 
-上游处于开发者预览阶段：若 `deepseekAccount.startSignIn` 或平台的回调契约发生变化，overlay 会自行停止生效（并在日志里说明），而不是让容器坏掉——届时只是不再提供粘贴这条路径。
+镜像钉住插件仓库的 **tag**（`REMOTE_SIGNIN_VERSION`，当前 `v0.1.1`）：插件自己的 CI 验证它，镜像拿到的是构建时使用的那个版本。上游处于开发者预览阶段——若 `deepseekAccount.startSignIn` 或平台的回调契约发生变化，插件会自行停止生效（并在日志里说明），而不是让容器坏掉；届时只是不再提供粘贴这条路径，`REMOTE_SIGNIN=off` 是显式回到上游行为的方式。

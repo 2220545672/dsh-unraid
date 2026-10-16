@@ -24,9 +24,10 @@
 #  4b. the password gate works      — no credentials / wrong password / forged cookie
 #      all fail, the right password mints a cookie that carries the session (also for
 #      the WebSocket upgrade), and the shipped default announces itself.
-#  4h. the remote sign-in bridge    — /remote-login is served, gated, and its
-#      callback target is only live while a sign-in actually waits; REMOTE_SIGNIN=off
-#      leaves upstream behaviour alone.
+#  4h. remote sign-in (the plugin) — the claim loads, the panel script and page are
+#      served and gated, the document carries the injected panel, and the callback
+#      target is only live while a sign-in actually waits; REMOTE_SIGNIN=off leaves
+#      upstream behaviour alone.
 #   5. bwrap confines a shell       — the sandbox rung Unraid depends on exists.
 #   6. both Caddyfiles validate     — a config typo cannot ship.
 set -Eeuo pipefail
@@ -334,18 +335,19 @@ else
     fail 'the automatic heal did not store a fresh dsh-auth cookie'
 fi
 
-# 4h — the remote sign-in bridge (docs/remote-signin.md). Upstream refuses an account
-# sign-in unless the browser's own origin is a loopback address — measured against the
-# platform, `redirect_uri=https://<host>/...` answers 50005 while
+# 4h — remote sign-in (docs/remote-signin.md). Upstream refuses an account sign-in unless
+# the browser's own origin is a loopback address — measured against the platform,
+# `redirect_uri=https://<host>/...` answers 50005 while
 # `redirect_uri=http://127.0.0.1:<port>/...` answers code 0 — and no browser on the LAN
-# or on the internet can reach such an address. The image therefore claims one and
-# serves a page that carries the undelivered callback back to DSH's own route.
+# or on the internet can reach such an address. The dsh-remote-signin plugin claims one,
+# puts a paste box into the DSH page while a sign-in waits, and carries the undelivered
+# callback back to DSH's own route.
 #
-# Three things have to hold, and each has failed in some design: the overlay must load
-# (otherwise the sign-in still dies locally), the page must be served and gated like
-# every other surface, and the path it targets must be reachable *only* while an
-# attempt waits — a permanently live /oauth/callback would be a worse design than the
-# bug it fixes.
+# Four things have to hold, and each has failed in some design: the plugin must load and
+# claim its origin; the panel script and the standalone page must be served and gated like
+# every other surface; the document must actually carry the injected panel; and the path
+# they target must be reachable *only* while an attempt waits — a permanently live
+# /oauth/callback would be a worse design than the bug it fixes.
 BRIDGE_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
     "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-login" || true)"
 BRIDGE_BODY="$(curl --silent --max-time 5 "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-login" || true)"
@@ -354,33 +356,49 @@ BRIDGE_TYPE="$(curl --silent --output /dev/null --write-out '%{content_type}' --
 if [[ "${BRIDGE_CODE}" == "200" && "${BRIDGE_TYPE}" == text/html* ]] \
     && grep --quiet -- '/oauth/callback' <<< "${BRIDGE_BODY}" \
     && grep --quiet -- 'state' <<< "${BRIDGE_BODY}"; then
-    pass '/remote-login serves the remote sign-in bridge page'
+    pass '/remote-login serves the standalone remote sign-in page'
 else
     fail "/remote-login answered ${BRIDGE_CODE} (${BRIDGE_TYPE}) without the expected callback markup"
 fi
 if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
     "http://127.0.0.1:${PORT}/remote-login" || true)" == "401" ]]; then
-    pass 'the bridge page is behind the same gate as the UI (401 without credentials)'
+    pass 'the standalone page is behind the same gate as the UI (401 without credentials)'
 else
-    fail 'the bridge page is reachable without authenticating'
+    fail 'the standalone page is reachable without authenticating'
+fi
+PANEL_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+    "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-signin/inpage.js" || true)"
+PANEL_BODY="$(curl --silent --max-time 5 "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-signin/inpage.js" || true)"
+if [[ "${PANEL_CODE}" == "200" ]] && grep --quiet -- 'dsh-remote-signin-panel' <<< "${PANEL_BODY}"; then
+    pass '/remote-signin/inpage.js serves the in-page panel script'
+else
+    fail "/remote-signin/inpage.js answered ${PANEL_CODE} without the panel markup"
+fi
+# The document itself is the other half of "automatic": without this row injected, the
+# panel never runs and the operator is back to finding /remote-login by hand.
+INDEX_HTML="$(curl --silent --location --max-time 10 "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/" || true)"
+if grep --quiet -- 'remote-signin/inpage.js' <<< "${INDEX_HTML}"; then
+    pass 'the DSH document carries the injected panel script'
+else
+    fail 'the DSH document does not reference the panel script, so the panel would never appear'
 fi
 CALLBACK_IDLE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
     "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/oauth/callback?code=smoke-test&state=smoke-test" || true)"
 if [[ "${CALLBACK_IDLE}" == "404" ]]; then
-    pass 'the callback path is dead without a pending sign-in (the page alone completes nothing)'
+    pass 'the callback path is dead without a pending sign-in (the panel alone completes nothing)'
 else
     fail "no sign-in is pending, yet /oauth/callback answered ${CALLBACK_IDLE}, expected 404"
 fi
-OVERLAY_LINE=''
+PLUGIN_LINE=''
 for _ in $(seq 1 30); do
-    OVERLAY_LINE="$(docker logs "${NAME}" 2>&1 | grep '\[remote-signin\] active' | tail -1)"
-    [[ -n "${OVERLAY_LINE}" ]] && break
+    PLUGIN_LINE="$(docker logs "${NAME}" 2>&1 | grep '\[remote-signin\] active' | tail -1)"
+    [[ -n "${PLUGIN_LINE}" ]] && break
     sleep 2
 done
-if [[ "${OVERLAY_LINE}" == *'loopback claim'* ]]; then
-    pass 'the remote sign-in overlay loaded and claimed its loopback origin'
+if [[ "${PLUGIN_LINE}" == *'claim http://127.0.0.1:'* ]]; then
+    pass "the dsh-remote-signin plugin loaded and claimed its loopback origin (${PLUGIN_LINE#*active — })"
 else
-    fail "the remote sign-in overlay never reported itself active (log said: ${OVERLAY_LINE:-nothing})"
+    fail "the dsh-remote-signin plugin never reported itself active (log said: ${PLUGIN_LINE:-nothing})"
 fi
 
 # 4i — REMOTE_SIGNIN=off is the documented escape hatch back to upstream behaviour, and
@@ -403,9 +421,9 @@ for _ in $(seq 1 30); do
 done
 OFF_LOG="$(docker logs "${OFF_NAME}" 2>&1)"
 if grep --quiet 'remote sign-in: off' <<<"${OFF_LOG}" && ! grep --quiet '\[remote-signin\] active' <<<"${OFF_LOG}"; then
-    pass 'REMOTE_SIGNIN=off leaves the overlay unloaded'
+    pass 'REMOTE_SIGNIN=off leaves the plugin unloaded'
 else
-    fail 'REMOTE_SIGNIN=off either kept the overlay or never said so in the log'
+    fail 'REMOTE_SIGNIN=off either kept the plugin loaded or never said so in the log'
 fi
 docker rm -f "${OFF_NAME}" >/dev/null 2>&1 || true
 if docker run --rm \

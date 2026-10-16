@@ -15,8 +15,10 @@
 #     ...) or to a trusted network. Anything else fails closed.
 #   * DeepSeek *account* sign-in only works from a browser that can reach a
 #     loopback address, which a remote browser cannot. REMOTE_SIGNIN=on (the
-#     default) loads an overlay that claims such an address and serves the bridge
-#     page that finishes the flow — see docs/remote-signin.md.
+#     default) loads github.com/2220545672/dsh-remote-signin, which claims such an
+#     address and puts the paste step into the page itself — see
+#     docs/remote-signin.md. The plugin is installed from its own repository and
+#     pinned by tag below; nothing of it is maintained here.
 
 ARG NODE_VERSION=24.21.0
 ARG CADDY_VERSION=2.11.7
@@ -24,14 +26,20 @@ ARG CADDY_VERSION=2.11.7
 # ---------------------------------------------------------------- runtime deps
 FROM node:${NODE_VERSION}-bookworm-slim AS deps
 ARG DSH_VERSION
+# The remote sign-in plugin has its own repository and its own release schedule
+# (github.com/2220545672/dsh-remote-signin). It is pinned to a tag on purpose: a build
+# of this image must get the plugin version this Dockerfile was tested with, and the
+# plugin's own CI is what validates it.
+ARG REMOTE_SIGNIN_VERSION=v0.1.1
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR /app
 
 RUN set -eux; \
     test -n "${DSH_VERSION}"; \
-    printf '{\n  "name": "dsh-runtime",\n  "private": true,\n  "dependencies": { "@deepseek-ai/dsh": "%s" }\n}\n' "${DSH_VERSION}" > package.json; \
+    printf '{\n  "name": "dsh-runtime",\n  "private": true,\n  "dependencies": { "@deepseek-ai/dsh": "%s", "dsh-remote-signin": "github:2220545672/dsh-remote-signin#%s" }\n}\n' "${DSH_VERSION}" "${REMOTE_SIGNIN_VERSION}" > package.json; \
     npm install --omit=dev --no-audit --no-fund --loglevel=warn; \
     node -e 'const want = process.env.DSH_VERSION; const got = require("/app/node_modules/@deepseek-ai/dsh/package.json").version; if (got !== want) { console.error(`resolved ${got}, expected ${want}`); process.exit(1); }'; \
+    node -e 'const p = require("/app/node_modules/dsh-remote-signin/package.json"); require("node:fs").accessSync("/app/node_modules/dsh-remote-signin/cordis.patch.yml"); console.log(`remote-signin plugin ${p.version}`);'; \
     test -f /app/node_modules/@deepseek-ai/dsh/lib/bin.js; \
     rm -rf /root/.npm
 
@@ -127,12 +135,6 @@ COPY --from=deps /app /app
 COPY --from=caddy /usr/local/bin/caddy /usr/local/bin/caddy
 COPY docker/entrypoint.sh docker/healthcheck.sh /usr/local/bin/
 COPY docker/Caddyfile.edge docker/Caddyfile.lan /etc/caddy/
-# The remote sign-in overlay (docs/remote-signin.md): a launcher patch entry plus
-# the plugin it points at, loaded only while REMOTE_SIGNIN=on, and the bridge page
-# Caddy serves at /remote-login. Nothing here is on the request path of a normal
-# session; the page is inert without a pending sign-in.
-COPY docker/remote-signin/dsh-remote-signin.mjs docker/remote-signin/patch.yml /etc/dsh/remote-signin/
-COPY docker/remote-signin/bridge.html /etc/caddy/bridge/remote-login.html
 
 RUN set -eux; \
     chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh /usr/local/bin/caddy; \
