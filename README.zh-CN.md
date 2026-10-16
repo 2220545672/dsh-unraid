@@ -1,6 +1,6 @@
 <h1 align="center">DSH for Unraid</h1>
 
-<p align="center"><a href="https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/">Community Applications</a> 上的 DSH（<a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>，浏览器里用的 AI 编程智能体）模板。容器镜像本身在 <a href="https://github.com/2220545672/dsh-docker">2220545672/dsh-docker</a> 构建；本仓库是 Unraid 那一侧：模板、图标与 CA 相关文档。</p>
+<p align="center"><a href="https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/">Community Applications</a> 上的 DSH（<a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>，浏览器里用的 AI 编程智能体）模板：一个容器、命令沙箱在 Unraid 内核上直接可用、跟随上游自动更新。</p>
 
 <p align="center"><a href="README.md">English</a> · <b>中文说明</b></p>
 
@@ -29,7 +29,7 @@
 
 ## 模板字段
 
-每个变量的完整说明（以及它背后的安全模型）跟着镜像走：[dsh-docker README](https://github.com/2220545672/dsh-docker/blob/main/README.zh-CN.md#可能会用到的设置) 与 [docs/security.zh-CN.md](https://github.com/2220545672/dsh-docker/blob/main/docs/security.zh-CN.md)。
+每个变量的完整说明（以及它背后的安全模型）见项目文档：[设置与环境变量](https://github.com/2220545672/dsh-docker/blob/main/README.zh-CN.md#可能会用到的设置) 与 [安全模型](https://github.com/2220545672/dsh-docker/blob/main/docs/security.zh-CN.md)。
 
 | 字段 | 默认 | 作用 |
 |---|---|---|
@@ -52,9 +52,8 @@ Unraid 内核没有编入 Landlock，DSH 的命令沙箱只剩第二梯队：镜
 `bwrap` 要创建命名空间，容器默认的 seccomp 配置与 `/proc` 掩码会挡住它——这两个参数就是
 放行的东西。没有它们，智能体的 bash 工具会拒绝执行并报 `SANDBOX_UNAVAILABLE`。
 
-对照实验、取舍，以及两种会误报的自查方式都在镜像仓库：
-[docs/sandbox.zh-CN.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.zh-CN.md)
-（这份文档原先在本仓库，名为 `docs/unraid-sandbox.md`）。
+对照实验、取舍，以及两种会误报的自查方式都在项目的沙箱说明里：
+[docs/sandbox.zh-CN.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.zh-CN.md)。
 
 ## 更新
 
@@ -66,7 +65,8 @@ Unraid 内核没有编入 Landlock，DSH 的命令沙箱只剩第二梯队：镜
 | `:0.2.1-alpha.4` | 钉住某个确切版本 |
 | `:alpha` · `:rc` · `:stable` | 跟随某个上游通道 |
 
-镜像由 [dsh-docker](https://github.com/2220545672/dsh-docker) 的每小时任务在上游一发版就重建并冒烟测试；发布说明也在那边，不在本仓库。
+镜像在上游一发版就自动重建并冒烟测试，这里不需要任何配置——更新即可。发布说明见
+[Releases](https://github.com/2220545672/dsh-docker/releases)。
 
 ## 常见问题
 
@@ -78,42 +78,22 @@ Unraid 内核没有编入 Landlock，DSH 的命令沙箱只剩第二梯队：镜
 | 更新了却没变化 | Unraid 只在镜像 digest 变化时重建容器——用 **force update**。 |
 | 页面一直转圈 | **Public URL** 必须与你实际打开的地址一致（协议 + 主机，不带路径）。`docker logs <容器名> \| head -30` 会打印它选定的模式。 |
 
-更多排障（登录粘贴面板、Caddy/DSH 内部、`docker inspect` 细节）见镜像仓库的
-[README](https://github.com/2220545672/dsh-docker/blob/main/README.zh-CN.md#常见问题)。
+更多排障（登录粘贴面板、Caddy/DSH 内部、`docker inspect` 细节）见
+[项目文档](https://github.com/2220545672/dsh-docker/blob/main/README.zh-CN.md#常见问题)。
 
 ## 从别的 DSH 镜像迁过来
 
 从 `ghcr.io/okxlin/deepseek-harness`（容器常叫 `dsh-web`）等社区镜像切过来、把停机时间压到最小：
 [docs/migrate-from-another-image.zh-CN.md](docs/migrate-from-another-image.zh-CN.md)。
 
-## 本仓库内容
-
-```
-.
-├── templates/dsh.xml   # Community Applications 解析的就是这个文件
-├── templates/img/      # CA 图标（以及生成它的素材与脚本）
-├── icon.svg            # 仓库图标，CA 目录结构要求
-├── ca_profile.xml      # CA 仓库信息（<Profile> 不能为空）
-├── scripts/            # 模板自检、图标生成、静态闸门
-└── docs/               # CA 提交说明、坑位清单、迁移指南
-```
-
-维护说明——模板自检、图标流水线、提交流程，以及唯一一条跨仓库检查——见
-[CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md)。
-
-⚠️ **模板是快照。** Community Applications 在用户**安装时**把 `templates/dsh.xml`
-复制成 `/boot/config/plugins/dockerMan/templates-user/my-DSH.xml`；此后这里的改动只影响
-新安装的用户与目录页，**永远不会**到达已安装的机器。必须让所有人都拿到的行为要放进镜像。
-见 [docs/ca-pitfalls.zh-CN.md](docs/ca-pitfalls.zh-CN.md)。
-
 ## 支持
 
 - **Unraid 论坛帖：**[DSH — DeepSeek Harness, AI coding agent in your browser](https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/)——请附上 `docker logs DSH | head -30`、Unraid 与内核版本（`uname -r`）、以及 **Public URL** / **Allowed Clients** 的设置。
-- **镜像本身的问题：**[dsh-docker issues](https://github.com/2220545672/dsh-docker/issues)。
+- **Bug 与建议：**[GitHub Issues](https://github.com/2220545672/dsh-docker/issues)。
 - **DSH 自身的问题**（模型、插件、界面）：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)。
 
 ## 许可
 
-MIT，见 [LICENSE](LICENSE)。DeepSeek Harness 本身由 DeepSeek 以 MIT 发布，本仓库只做 Unraid 侧的打包。
+MIT，见 [LICENSE](LICENSE)。DeepSeek Harness 本身由 DeepSeek 以 MIT 发布；这份打包只多了 Unraid 模板、图标与文档。
 
 社区打包项目：与 DeepSeek、Lime Technology 均无隶属或授权关系。图标由官方 DSH 标识与官方 Unraid 标识合成（[来源与商标说明](templates/img/src/README.md)）。

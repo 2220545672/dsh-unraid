@@ -1,6 +1,6 @@
 <h1 align="center">DSH for Unraid</h1>
 
-<p align="center">The <a href="https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/">Community Applications</a> template for <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> — a coding agent you drive from the browser, running on your Unraid server. The container image itself is built in <a href="https://github.com/2220545672/dsh-docker">2220545672/dsh-docker</a>; this repository is the Unraid side: the template, the icon and the CA notes.</p>
+<p align="center">The Community Applications template for <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> — a coding agent you drive from the browser, running on your Unraid server. One container, a command sandbox that works on Unraid kernels, updated automatically from upstream.</p>
 
 <p align="center"><b>English</b> · <a href="README.zh-CN.md">中文说明</a></p>
 
@@ -29,7 +29,7 @@
 
 ## Template fields
 
-The full description of each variable (and of the security model behind it) lives with the image: [dsh-docker README](https://github.com/2220545672/dsh-docker#settings-you-may-need) and [docs/security.md](https://github.com/2220545672/dsh-docker/blob/main/docs/security.md).
+Full descriptions of every variable — and of the security model behind them — are in the project documentation: [settings and environment variables](https://github.com/2220545672/dsh-docker#settings-you-may-need) and [the security model](https://github.com/2220545672/dsh-docker/blob/main/docs/security.md).
 
 | Field | Default | What it does |
 |---|---|---|
@@ -55,8 +55,8 @@ what let it through. Without them the agent's bash tool refuses to run and repor
 `SANDBOX_UNAVAILABLE`.
 
 The controlled experiments, the trade-off and the two checks that produce false alarms
-are in the image repository: [docs/sandbox.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md)
-(that document used to live here as `docs/unraid-sandbox.md`).
+are in the project's sandbox notes:
+[sandbox.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md).
 
 ## Update
 
@@ -68,7 +68,9 @@ are in the image repository: [docs/sandbox.md](https://github.com/2220545672/dsh
 | `:0.2.1-alpha.4` | Pin an exact version |
 | `:alpha` · `:rc` · `:stable` | Follow one upstream channel |
 
-The image is rebuilt and smoke-tested by [dsh-docker](https://github.com/2220545672/dsh-docker)'s hourly job as soon as upstream publishes; releases and their notes are there, not here.
+The image is rebuilt and smoke-tested automatically as soon as upstream publishes a
+release, so there is nothing to configure here — just update. Release notes:
+[Releases](https://github.com/2220545672/dsh-docker/releases).
 
 ## Problems
 
@@ -81,42 +83,21 @@ The image is rebuilt and smoke-tested by [dsh-docker](https://github.com/2220545
 | Page never finishes loading | **Public URL** must match the address you actually open (scheme + host, no path). `docker logs <container> \| head -30` prints the mode it chose. |
 
 More troubleshooting (the sign-in paste panel, Caddy/DSH internals, `docker inspect`
-details) is in the image repository's [README](https://github.com/2220545672/dsh-docker#problems).
+details) is in the [project documentation](https://github.com/2220545672/dsh-docker#problems).
 
 ## Moving over from another DSH image
 
 Switching from `ghcr.io/okxlin/deepseek-harness` (container `dsh-web`) or a similar
 community image, with minimal downtime: [docs/migrate-from-another-image.md](docs/migrate-from-another-image.md).
 
-## This repository
-
-```
-.
-├── templates/dsh.xml   # the file Community Applications parses
-├── templates/img/      # the CA icon (and the assets + generator that produce it)
-├── icon.svg            # repository icon, required by the CA layout
-├── ca_profile.xml      # CA repository information (non-empty <Profile> required)
-├── scripts/            # template self-checks, icon generation, static gate
-└── docs/               # CA submission notes, pitfalls, migration guide
-```
-
-Maintenance notes — the template self-checks, the icon pipeline, the submission flow
-and the one cross-repository check — are in [CONTRIBUTING.md](CONTRIBUTING.md).
-
-⚠️ **The template is a snapshot.** Community Applications copies `templates/dsh.xml`
-into `/boot/config/plugins/dockerMan/templates-user/my-DSH.xml` **when the user
-installs it**; later changes here reach new installs and the catalogue page, but never
-an existing installation. Behaviour that must reach everybody belongs in the image.
-See [docs/ca-pitfalls.md](docs/ca-pitfalls.md).
-
 ## Support
 
 - **Unraid forum thread:** [DSH — DeepSeek Harness, AI coding agent in your browser](https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/) — please include `docker logs DSH | head -30`, your Unraid and kernel version (`uname -r`), and how **Public URL** / **Allowed Clients** are set.
-- **Bugs in the image itself:** [dsh-docker issues](https://github.com/2220545672/dsh-docker/issues).
+- **Bugs and requests:** [GitHub Issues](https://github.com/2220545672/dsh-docker/issues).
 - **Bugs in DSH itself** (models, plugins, UI): [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). DeepSeek Harness itself is MIT, published by DeepSeek; this repository only packages it for Unraid.
+MIT — see [LICENSE](LICENSE). DeepSeek Harness itself is MIT, published by DeepSeek; this packaging only adds the Unraid template, the icon and the documentation.
 
 Community packaging: not affiliated with, endorsed by or authorised by DeepSeek or Lime Technology. The icon combines the official DSH mark with the official Unraid mark ([sources and trademark note](templates/img/src/README.md)).
