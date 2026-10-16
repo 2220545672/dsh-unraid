@@ -116,14 +116,21 @@ Two halves, both in the image:
 ## Using it
 
 1. Press **Sign in** with a DeepSeek account in the DSH UI. The login page opens in a
-   new tab; finish it there.
+   new tab; finish it there. (Nothing jumps to the bridge for you: the tab that is now
+   waiting stays waiting until you do step 3.)
 2. That tab then lands on a `127.0.0.1` "can't reach this page" error. **That is the
    expected step.** Select its address bar, copy the whole address.
 3. Open **`/remote-login`** on the same address you use for the UI
    (`https://dsh.meix.top/remote-login`, `http://192.168.3.2:8080/remote-login`, …),
-   paste the address, press **Continue**.
+   paste the address, press **Continue**. The page sends the code and then tells you
+   what the server answered — signed in, expired, or "that address is not the callback
+   of a waiting sign-in" — instead of navigating you into a bare error page.
 4. The dialog in the original tab switches to signed in, and the login tab closes
    itself.
+
+Do this **within about ten minutes and against the same container**: the code belongs
+to that attempt, it expires with it, and recreating the container (an update, a settings
+change) discards it. Nothing breaks if that happens — start the sign-in again.
 
 `docker logs <container> | head -30` prints the bridge address, and one line from the
 overlay when it loaded:
@@ -163,10 +170,11 @@ same place; the bridge exists for the times when the tunnel is not at hand.
 
 | Symptom | What it means |
 |---|---|
-| The dialog says *waiting for browser* forever | Expected until you paste the address in step 3; it expires after 10 minutes. |
+| The dialog says *waiting for browser* forever | Expected until you paste the address in step 3; it expires after 10 minutes. There is no jump to `/remote-login`: open it yourself (it is in the startup log). |
+| The bridge page says the address is not a callback address | You copied the wrong tab or a truncated address: it must contain `code=` **and** `state=`, and look like `http://127.0.0.1:<port>/oauth/callback?…`. |
+| The bridge page says **no sign-in is waiting** (`404`) | The attempt is gone, and the page reports the server's own answer rather than dead-ending you on an empty error page. Two causes, both common: it expired (~10 minutes), or it belonged to a **different DSH instance** — recreating or upgrading the container discards it, and a tab left open from the previous instance still *looks* like it is waiting. Start the sign-in again in the tab you are actually using. |
+| The bridge page says the state does not match (`400`) | The address came from a different attempt, or the code was already consumed. Press **Sign in** again. |
 | The login tab shows a DeepSeek error instead of a login form | The overlay did not load. `docker logs <container> \| grep remote-signin` says why (`off`, an unreadable overlay, or `INACTIVE`). |
-| `/remote-login` says the address is not a callback address | You copied the wrong tab or a truncated address: it must contain `code=` **and** `state=`, and look like `http://127.0.0.1:<port>/oauth/callback?…`. |
-| Pasting ends on a DSH `400` | The attempt already expired, or the address came from a different attempt (the `state` is per attempt). Press **Sign in** again. |
 | You want the old behaviour | `REMOTE_SIGNIN=off`, then recreate the container. |
 
 ## Where the pieces live
