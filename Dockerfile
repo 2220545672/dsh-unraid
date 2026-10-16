@@ -37,7 +37,7 @@ ARG DSH_VERSION
 # build died with "Permission denied (publickey)" — while the same shorthand in a
 # throwaway container that had a working ssh agent picked https and succeeded. A tag
 # is a release of a public repository; nothing here should depend on a key.
-ARG REMOTE_SIGNIN_VERSION=v0.2.0
+ARG REMOTE_SIGNIN_VERSION=v0.2.1
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR /app
 
