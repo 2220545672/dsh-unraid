@@ -4,7 +4,9 @@
 
 本仓库是 DSH 的 **Unraid 那一侧**：Community Applications 模板，以及围绕它的检查与文档。
 容器镜像由 [2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) 构建、冒烟测试并
-发布——这里没有 Dockerfile，本仓库也不产出任何 release 或镜像 tag。
+发布——这里没有 Dockerfile，本仓库也不产出任何 release 或镜像 tag。（2026-10-16 拆分之前那条
+发布链留下的两个 Release 已于 2026-10-17 删除：Releases 页为空是**预期状态**，不代表项目停更——
+镜像的 release 见 [dsh-docker 的 releases](https://github.com/2220545672/dsh-docker/releases)。）
 
 这份文档是 fork 的操作手册，也是维护者改模板时的checklist。
 

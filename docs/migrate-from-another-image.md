@@ -54,4 +54,4 @@ Before you delete the old container, rollback = point the reverse proxy upstream
 
 ## On every upstream release afterwards
 
-This image **tracks upstream automatically**: every day it checks the highest version of `@deepseek-ai/dsh` on npm (alpha/rc included), and when a new version appears it builds, smoke-tests and pushes it, then creates a `dsh-<version>` tag and a Release. All you do is click **force update** once on the Unraid Docker page (or wait for the apply update hint); no configuration changes are needed.
+This image **tracks upstream automatically**: every hour it checks the highest version of `@deepseek-ai/dsh` on npm (alpha/rc included), and when a new version appears it builds, smoke-tests and pushes it, then creates a `dsh-v<version>` tag and a Release (the `v` matches upstream's own release tags). All you do is click **force update** once on the Unraid Docker page (or wait for the apply update hint); no configuration changes are needed.
