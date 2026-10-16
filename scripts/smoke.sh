@@ -24,10 +24,10 @@
 #  4b. the password gate works      — no credentials / wrong password / forged cookie
 #      all fail, the right password mints a cookie that carries the session (also for
 #      the WebSocket upgrade), and the shipped default announces itself.
-#  4h. remote sign-in (the plugin) — the claim loads, the panel script and page are
-#      served and gated, the document carries the injected panel, and the callback
-#      target is only live while a sign-in actually waits; REMOTE_SIGNIN=off leaves
-#      upstream behaviour alone.
+#  4h. remote sign-in (the plugin) — the claim loads, the panel script is served and
+#      gated, the document carries the injected panel, and the callback target is only
+#      live while a sign-in actually waits; REMOTE_SIGNIN=off leaves upstream behaviour
+#      alone.
 #   5. bwrap confines a shell       — the sandbox rung Unraid depends on exists.
 #   6. both Caddyfiles validate     — a config typo cannot ship.
 set -Eeuo pipefail
@@ -343,29 +343,12 @@ fi
 # puts a paste box into the DSH page while a sign-in waits, and carries the undelivered
 # callback back to DSH's own route.
 #
-# Four things have to hold, and each has failed in some design: the plugin must load and
-# claim its origin; the panel script and the standalone page must be served and gated like
-# every other surface; the document must actually carry the injected panel; and the path
-# they target must be reachable *only* while an attempt waits — a permanently live
-# /oauth/callback would be a worse design than the bug it fixes.
-BRIDGE_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
-    "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-login" || true)"
-BRIDGE_BODY="$(curl --silent --max-time 5 "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-login" || true)"
-BRIDGE_TYPE="$(curl --silent --output /dev/null --write-out '%{content_type}' --max-time 5 \
-    "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-login" || true)"
-if [[ "${BRIDGE_CODE}" == "200" && "${BRIDGE_TYPE}" == text/html* ]] \
-    && grep --quiet -- '/oauth/callback' <<< "${BRIDGE_BODY}" \
-    && grep --quiet -- 'state' <<< "${BRIDGE_BODY}"; then
-    pass '/remote-login serves the standalone remote sign-in page'
-else
-    fail "/remote-login answered ${BRIDGE_CODE} (${BRIDGE_TYPE}) without the expected callback markup"
-fi
-if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
-    "http://127.0.0.1:${PORT}/remote-login" || true)" == "401" ]]; then
-    pass 'the standalone page is behind the same gate as the UI (401 without credentials)'
-else
-    fail 'the standalone page is reachable without authenticating'
-fi
+# Three things have to hold, and each has failed in some design: the plugin must load and
+# claim its origin; the panel script must be served and gated like every other surface;
+# and the document must actually carry the injected panel — the panel is the *only* way
+# the code comes back, so a missing injection is not a missing convenience, it is the
+# whole feature. The path it targets must also be reachable *only* while an attempt
+# waits: a permanently live /oauth/callback would be a worse design than the bug it fixes.
 PANEL_CODE="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
     "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-signin/inpage.js" || true)"
 PANEL_BODY="$(curl --silent --max-time 5 "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/remote-signin/inpage.js" || true)"
@@ -374,10 +357,10 @@ if [[ "${PANEL_CODE}" == "200" ]] && grep --quiet -- 'dsh-remote-signin-panel' <
 else
     fail "/remote-signin/inpage.js answered ${PANEL_CODE} without the panel markup"
 fi
-# The document itself is the other half of "automatic": without this row injected, the
-# panel never runs and the operator is back to finding /remote-login by hand. The cookie
-# jar matters: the first request answers 303 with a launch token, and the request that
-# follows it needs the DSH session cookie that response set.
+# The document itself is the other half of "automatic": without this row injected the
+# panel never runs and the sign-in cannot be finished at all. The cookie jar matters: the
+# first request answers 303 with a launch token, and the request that follows it needs the
+# DSH session cookie that response set.
 INDEX_JAR="${WORKDIR}/index-cookies.txt"
 INDEX_HTML="$(curl --silent --location --max-time 10 --cookie-jar "${INDEX_JAR}" --cookie "${INDEX_JAR}" \
     "${SMOKE_AUTH[@]}" "http://127.0.0.1:${PORT}/" || true)"

@@ -83,10 +83,10 @@
 		redir * /?token={$DSH_LAUNCH_TOKEN} 303
 	}
 
-	# /remote-login and /remote-signin/inpage.js are served by DSH itself — they belong
-	# to the remote-sign-in plugin (github.com/2220545672/dsh-remote-signin), which
-	# registers them on the web server. They need no route here: the catch-all below
-	# proxies them like any other path, and the password gate above still applies.
+	# /remote-signin/inpage.js is served by DSH itself — it belongs to the remote-sign-in
+	# plugin (github.com/2220545672/dsh-remote-signin), which registers it on the web
+	# server. It needs no route here: the catch-all below proxies it like any other path,
+	# and the password gate above still applies.
 
 	@dsh_bootstrap {
 		path /

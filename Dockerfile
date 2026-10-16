@@ -30,7 +30,7 @@ ARG DSH_VERSION
 # (github.com/2220545672/dsh-remote-signin). It is pinned to a tag on purpose: a build
 # of this image must get the plugin version this Dockerfile was tested with, and the
 # plugin's own CI is what validates it.
-ARG REMOTE_SIGNIN_VERSION=v0.1.1
+ARG REMOTE_SIGNIN_VERSION=v0.2.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR /app
 

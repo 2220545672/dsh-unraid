@@ -74,10 +74,10 @@ this image installs and pins:
   `http://127.0.0.1:47821`). A browser already on loopback passes through untouched, so
   the desktop app and an `ssh -L` session keep upstream behaviour exactly.
 * **The way back** — `assets/inpage.js` is injected into the DSH document and puts the
-  paste box into the page while an attempt waits; `assets/bridge.html` is the same thing
-  as a standalone page at `/remote-login`. Both take only `code` and `state` out of the
-  pasted address and send them to `/oauth/callback` **on the origin you are already
-  using**. Nothing is sent anywhere else, and neither can act as a redirector.
+  paste box into the page while an attempt waits. It takes only `code` and `state` out of
+  the pasted address and sends them to `/oauth/callback` **on the origin you are already
+  using** — nowhere else, so the panel cannot act as a redirector. There is no second
+  page: the panel is the only way the code comes back.
 
 The image itself only decides *whether* and *with which claim* the plugin loads
 (`REMOTE_SIGNIN`, `REMOTE_SIGNIN_ORIGIN`, and the launcher `--patch` the entrypoint
@@ -101,7 +101,7 @@ passes). The plugin's code, its panel and its page are maintained in its own rep
 
 ## Security notes
 
-* `/remote-login` sits behind the same gate as the rest of the UI (`AUTH_MODE=builtin`
+* `/remote-signin/inpage.js` sits behind the same gate as the rest of the UI (`AUTH_MODE=builtin`
   or whatever authenticates in front). It has to: it hands a credential-bearing URL to
   the server.
 * The address you paste contains an authorization **code**. It is single-use, bound to
@@ -130,10 +130,10 @@ passes). The plugin's code, its panel and its page are maintained in its own rep
    sign-in".
 4. The sign-in dialog in that tab switches to signed in, and the login tab closes itself.
 
-Nothing to jump to and nothing to remember: the panel is the flow. `/remote-login` serves
-the same thing as a standalone page for the times the panel is not there (a browser
-extension blocking it, `REMOTE_SIGNIN` was turned off after the page loaded, …); the
-startup log names it.
+Nothing to jump to and nothing to remember: the panel is the flow, and it is the only way
+the code comes back. If it does not appear, the plugin is not loaded — `docker logs
+<container> | grep remote-signin` says why — and `REMOTE_SIGNIN=off` is the explicit way
+back to upstream's loopback-only behaviour (an API key, or an `ssh -L` tunnel).
 
 Do this **within about ten minutes and against the same container**: the code belongs to
 that attempt, it expires with it, and recreating the container (an update, a settings
@@ -143,14 +143,15 @@ change) discards it. Nothing breaks if that happens — start the sign-in again.
 names the claim and its own version when it loads:
 
 ```
-[entrypoint] remote sign-in: on — a remote browser finishes the sign-in in the DSH page;
-             the standalone page is https://dsh.example.com/remote-login
-[remote-signin] active — v0.1.1, claim http://127.0.0.1:47821, panel at
-             /remote-signin/inpage.js, page at /remote-login
+[entrypoint] remote sign-in: on — a remote browser finishes the sign-in in the DSH page:
+             when the login tab lands on the dead http://127.0.0.1:47821 page, a panel
+             appears there to paste its address into
+[remote-signin] active — v0.2.0, claim http://127.0.0.1:47821, panel at
+             /remote-signin/inpage.js
 ```
 
-(Without `PUBLIC_URL` the entrypoint cannot know which host port you published, so it
-names the path and your own port instead of guessing.)
+(The plugin's own `active` line is printed by DSH and is the one to read when
+something looks wrong: it names the claim and the version the image loaded.)
 
 ### The seamless alternative (no paste)
 
@@ -169,7 +170,7 @@ same place; the panel exists for the times when the tunnel is not at hand.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `REMOTE_SIGNIN` | `on` | `on` loads the [plugin](https://github.com/2220545672/dsh-remote-signin), which claims the loopback origin, puts the panel into the page and serves `/remote-login`; `off` is upstream's loopback-only behaviour. Any other value refuses to start. |
+| `REMOTE_SIGNIN` | `on` | `on` loads the [plugin](https://github.com/2220545672/dsh-remote-signin), which claims the loopback origin and puts the paste panel into the page; `off` is upstream's loopback-only behaviour. Any other value refuses to start. |
 | `REMOTE_SIGNIN_ORIGIN` | `http://127.0.0.1:47821` | The loopback origin claimed with the platform. Must be `http://` + one of `127.0.0.1` / `localhost` / `[::1]` + an explicit port; nothing may listen there. |
 
 The plugin's version is pinned by the `REMOTE_SIGNIN_VERSION` build argument in the
@@ -180,10 +181,10 @@ tested with, and the plugin's own CI is what validates it.
 
 | Symptom | What it means |
 |---|---|
-| The panel never appears | The plugin is not loaded: `docker logs <container> \| grep remote-signin` says why (`off`, a missing package, or `INACTIVE`), and `/remote-login` still works for a manual paste. |
+| The panel never appears | The plugin is not loaded: `docker logs <container> \| grep remote-signin` says why (`off`, a missing package, or `INACTIVE`). There is no fallback page — the plugin has to load for the panel to exist. |
 | The dialog says *waiting for browser* forever | Expected until you paste into the panel; it expires after 10 minutes. |
 | The panel says the address is not a callback address | You copied the wrong tab or a truncated address: it must contain `code=` **and** `state=`, and look like `http://127.0.0.1:<port>/oauth/callback?…`. |
-| The panel (or page) says **no sign-in is waiting** (`404`) | The attempt is gone, and the panel reports the server's own answer rather than dead-ending you on an empty error page. Two causes, both common: it expired (~10 minutes), or it belonged to a **different DSH instance** — recreating or upgrading the container discards it, and a tab left open from the previous instance still *looks* like it is waiting. Start the sign-in again in the tab you are actually using. |
+| The panel says **no sign-in is waiting** (`404`) | The attempt is gone, and the panel reports the server's own answer rather than dead-ending you on an empty error page. Two causes, both common: it expired (~10 minutes), or it belonged to a **different DSH instance** — recreating or upgrading the container discards it, and a tab left open from the previous instance still *looks* like it is waiting. Start the sign-in again in the tab you are actually using. |
 | The bridge page says the state does not match (`400`) | The address came from a different attempt, or the code was already consumed. Press **Sign in** again. |
 | The login tab shows a DeepSeek error instead of a login form | The overlay did not load. `docker logs <container> \| grep remote-signin` says why (`off`, an unreadable overlay, or `INACTIVE`). |
 | You want the old behaviour | `REMOTE_SIGNIN=off`, then recreate the container. |
@@ -193,11 +194,10 @@ tested with, and the plugin's own CI is what validates it.
 | Path (in the image) | Where it is maintained | Role |
 |---|---|---|
 | `/app/node_modules/dsh-remote-signin/src/index.js` | [dsh-remote-signin](https://github.com/2220545672/dsh-remote-signin) → `src/index.js` | The claim, the asset routes and the panel injection. |
-| `/app/node_modules/dsh-remote-signin/assets/inpage.js` | same repository → `assets/inpage.js` | The panel that appears in the DSH page. |
-| `/app/node_modules/dsh-remote-signin/assets/bridge.html` | same repository → `assets/bridge.html` | The standalone page at `/remote-login`. |
+| `/app/node_modules/dsh-remote-signin/assets/inpage.js` | same repository → `assets/inpage.js` | The panel that appears in the DSH page — the only way the code comes back. |
 | `/app/node_modules/dsh-remote-signin/cordis.patch.yml` | same repository → `cordis.patch.yml` | The launcher patch entry the entrypoint passes with `--patch`. |
 | `/usr/local/bin/entrypoint.sh` | this repository | Decides whether to load the plugin, validates `REMOTE_SIGNIN_ORIGIN`, and names the standalone page in the log. |
-| `/etc/caddy/Caddyfile.{edge,lan}` | this repository | No route of its own for the plugin: `/remote-login` and `/remote-signin/*` are proxied like any other path, behind the same gate as the UI. |
+| `/etc/caddy/Caddyfile.{edge,lan}` | this repository | No route of its own for the plugin: `/remote-signin/inpage.js` is proxied like any other path, behind the same gate as the UI. |
 
 The image pins a **tag** of the plugin repository (`REMOTE_SIGNIN_VERSION`, `v0.1.1`
 today): the plugin's CI validates it, and an image gets the version it was built with.

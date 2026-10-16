@@ -493,14 +493,10 @@ fi
 : > "${DSH_STARTUP_LOG}"
 log "starting DeepSeek Harness ${DSH_VERSION:-unknown} on 127.0.0.1:${DSH_INTERNAL_PORT} (mode=${MODE})"
 if (( REMOTE_SIGNIN_ACTIVE == 1 )); then
-    # The plugin puts the paste box into the DSH page by itself; this line names the
-    # standalone page for the cases where it did not (and the plugin's own "active"
-    # line, printed by DSH, names the claim and the version it loaded).
-    if [[ -n "${PUBLIC_ORIGIN}" ]]; then
-        log "remote sign-in: on — a remote browser finishes the sign-in in the DSH page; the standalone page is ${PUBLIC_ORIGIN}/remote-login"
-    else
-        log "remote sign-in: on — a remote browser finishes the sign-in in the DSH page; the standalone page is /remote-login on the address you opened this UI with (e.g. http://<this-host>:<published-port>/remote-login)"
-    fi
+    # The plugin puts the paste box into the DSH page by itself, so there is no address
+    # to name here — only what to expect. The plugin's own "active" line, printed by
+    # DSH, names the claim and the version it loaded.
+    log "remote sign-in: on — a remote browser finishes the sign-in in the DSH page: when the login tab lands on the dead ${REMOTE_SIGNIN_ORIGIN} page, a panel appears there to paste its address into"
 else
     log "remote sign-in: off — account sign-in needs a browser on this machine (or an ssh -L tunnel); an API key works from anywhere"
 fi
