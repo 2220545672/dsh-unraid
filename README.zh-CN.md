@@ -1,6 +1,6 @@
 <h1 align="center">DSH for Unraid</h1>
 
-<p align="center"><a href="https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/">Community Applications</a> 上的 DSH（<a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>，浏览器里用的 AI 编程智能体）模板：一个容器、命令沙箱在 Unraid 内核上直接可用、跟随上游自动更新。</p>
+<p align="center"><a href="https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/">Community Applications</a> 上的 DSH（<a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>，浏览器里用的 AI 编程智能体）模板：一个容器、命令沙箱在 Unraid 内核上直接可用、装的插件跨更新存活、内置远程登录、跟随上游自动更新。</p>
 
 <p align="center"><a href="README.md">English</a> · <b>中文说明</b></p>
 
@@ -14,6 +14,12 @@
 ---
 
 > **开发者预览。** DeepSeek Harness 处于 _开发者预览_ 阶段，正在快速迭代。**未来将出现破坏兼容性的变更。** —— 引自[上游项目](https://github.com/deepseek-ai/deepseek-harness/blob/main/README.zh.md#开发者预览)。镜像会自动跟随上游发布；想自己掌握节奏，可以钉住版本标签。
+
+## 这个模板的优势
+
+- **插件（以及插件要调用的命令行工具）跨更新存活。** 两者都在你的持久数据目录里、不在镜像里，所以 *force update* 不会把它们删掉：[装插件](#装插件)。
+- **DeepSeek 账号登录在任何浏览器上都可用。** 镜像内置远程登录插件并默认开启——登录标签页停在打不开的 `127.0.0.1` 页面后，粘贴面板会自己出现在 DSH 页面里。把模板里的 **Remote Sign-in** 设为 `off` 就回到上游「仅回环」的行为。
+- **上游更新由它替你跟。** 每小时的任务解析上游最新版本、重建镜像并在构建出的容器上跑冒烟；全部通过才发布——你要做的只是 Docker 页上的 **force update**，而 `/data` 与 `/workspace` 不会被它动到（[更新](#更新)）。
 
 ## 安装
 
@@ -67,6 +73,19 @@ Unraid 内核没有编入 Landlock，DSH 的命令沙箱只剩第二梯队：镜
 
 镜像在上游一发版就自动重建并冒烟测试，这里不需要任何配置——更新即可。发布说明见
 [Releases](https://github.com/2220545672/dsh-docker/releases)。
+
+## 装插件
+
+DSH 插件装在你持久 **Data Directory** 里的 profile 目录下，所以更新之后依然在：
+
+```bash
+docker exec -u 1000 <容器名> dsh plugin --profile web add @scope/some-plugin
+docker exec -u 1000 <容器名> dsh plugin --profile web add github:owner/repo
+```
+
+装完请重启容器，让 profile 重新组合。务必带 `-u 1000`：用 root 装，包在 appdata 里属 root，之后以 uid 1000 运行的 DSH 就读不到了。如果插件还要调自己的命令行工具，那个工具也得装在数据目录下——镜像 README 写了它在每次启动时会扫的两种布局：[自己装命令行工具](https://github.com/2220545672/dsh-docker/blob/main/README.zh-CN.md#自己装命令行工具)。
+
+远程登录插件已经在镜像里且默认开启——这一节是给你自己加别的东西用的。
 
 ## 常见问题
 

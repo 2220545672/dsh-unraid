@@ -1,6 +1,6 @@
 <h1 align="center">DSH for Unraid</h1>
 
-<p align="center">The Community Applications template for <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> — a coding agent you drive from the browser, running on your Unraid server. One container, a command sandbox that works on Unraid kernels, updated automatically from upstream.</p>
+<p align="center">The Community Applications template for <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> — a coding agent you drive from the browser, running on your Unraid server. One container, a command sandbox that works on Unraid kernels, plugins that survive an update, remote sign-in built in, updated automatically from upstream.</p>
 
 <p align="center"><b>English</b> · <a href="README.zh-CN.md">中文说明</a></p>
 
@@ -14,6 +14,20 @@
 ---
 
 > **Developer preview.** DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.** — quoted from the [upstream project](https://github.com/deepseek-ai/deepseek-harness#developer-preview). The image tracks upstream releases automatically, so pin a version tag if you would rather move on your own schedule.
+
+## What you get
+
+- **Plugins — and the command-line tools they call — survive updates.** Both live on your
+  persistent data directory, not in the image, so a *force update* does not remove them:
+  [Plugins](#plugins).
+- **DeepSeek account sign-in from any browser.** The image ships the remote sign-in plugin
+  and enables it by default — the login tab ends on a dead `127.0.0.1` page and the paste
+  panel appears in the DSH page by itself. Set **Remote Sign-in** to `off` for upstream's
+  loopback-only behaviour.
+- **It follows upstream for you.** An hourly job resolves the newest upstream release,
+  rebuilds the image and smoke-tests the built container; it is published only when every
+  check passes, so your part is **force update** on the Docker tab — and `/data` +
+  `/workspace` survive it ([Update](#update)).
 
 ## Install
 
@@ -71,6 +85,26 @@ are in the project's sandbox notes:
 The image is rebuilt and smoke-tested automatically as soon as upstream publishes a
 release, so there is nothing to configure here — just update. Release notes:
 [Releases](https://github.com/2220545672/dsh-docker/releases).
+
+## Plugins
+
+DSH plugins are installed into the profile that lives on your persistent **Data
+Directory**, so they are still installed after an update:
+
+```bash
+docker exec -u 1000 <container> dsh plugin --profile web add @scope/some-plugin
+docker exec -u 1000 <container> dsh plugin --profile web add github:owner/repo
+```
+
+Restart the container afterwards so the profile is composed again. Use `-u 1000`: as root
+the package ends up owned by root inside your appdata directory, and DSH — which runs as
+uid 1000 — can no longer read it. A plugin that shells out to its own command-line tool
+needs that tool under the data directory as well; the image README documents the two
+layouts it scans at every start:
+[Installing your own CLI tools](https://github.com/2220545672/dsh-docker#installing-your-own-cli-tools).
+
+The remote sign-in plugin is already in the image and on by default — this is for
+everything else you want to add.
 
 ## Problems
 
