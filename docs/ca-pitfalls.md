@@ -45,7 +45,7 @@ Every entry also states how this repository handles it: âœ… already avoided / âš
 
 | # | Item | Recommendation |
 |---|---|---|
-| D1 | Whether to mark `<Beta>true</Beta>` | The official field description says `<Beta>` is a "Legacy beta marker. Only true survives"; **upstream DSH currently only has alpha/rc versions** (we track the highest semver, including pre-releases), but **this packaging itself is stable**. My recommendation: **do not mark it for now**, and instead state honestly in the support thread title and `<Overview>` that "upstream is still pre-release and the image follows the newest version". If a reviewer suggests marking Beta, change it then (note B1: changing the template does not affect already-installed machines, but it does affect new users) |
+| D1 | Whether to mark `<Beta>true</Beta>` | The official field description says `<Beta>` is a "Legacy beta marker. Only true survives"; **upstream DSH currently publishes alpha/rc version numbers** (we track the highest semver), and **this packaging itself is stable**. My recommendation: **do not mark it for now**; the support thread and `<Overview>` state that the image follows the newest upstream version. If a reviewer suggests marking Beta, change it then (note B1: changing the template does not affect already-installed machines, but it does affect new users) |
 
 ---
 

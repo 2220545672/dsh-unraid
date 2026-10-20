@@ -45,7 +45,7 @@
 
 | # | 事项 | 建议 |
 |---|---|---|
-| D1 | 是否标记 `<Beta>true</Beta>` | 官方字段说明里 `<Beta>` 是"Legacy beta marker. Only true survives"；**上游 DSH 目前只有 alpha/rc 版本**（我们跟的是最高 semver，含预发布），但**这个打包本身是稳定的**。我的建议：**先不标**，改为在支持帖标题与 `<Overview>` 里如实写明"上游仍是预发布、镜像跟随最新版"。若审核者建议标 Beta，再改（注意 B1：改模板不影响已安装机器，但影响新用户） |
+| D1 | 是否标记 `<Beta>true</Beta>` | 官方字段说明里 `<Beta>` 是"Legacy beta marker. Only true survives"；**上游 DSH 目前发布的版本号是 alpha/rc**（我们跟的是最高 semver），但**这个打包本身是稳定的**。我的建议：**先不标**，支持帖与 `<Overview>` 里说明镜像跟随上游最新版即可。若审核者建议标 Beta，再改（注意 B1：改模板不影响已安装机器，但影响新用户） |
 
 ---
 

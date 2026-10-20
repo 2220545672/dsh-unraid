@@ -13,8 +13,6 @@
 
 ---
 
-> **Developer preview.** DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.** — quoted from the [upstream project](https://github.com/deepseek-ai/deepseek-harness#developer-preview). The image tracks upstream releases automatically, so pin a version tag if you would rather move on your own schedule.
-
 ## What you get
 
 - **Plugins — and the command-line tools they call — survive updates.** Both live on your

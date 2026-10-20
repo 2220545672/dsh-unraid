@@ -47,7 +47,7 @@ Both CA and the template guide require: **a container you maintain yourself must
 
 - what this application is, where the image is, and how to upgrade ([2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) tracks versions automatically, users only need to force update);
 - **why those two `--security-opt` are needed** (the Unraid kernel has no Landlock → bubblewrap is the only usable sandbox layer; see [dsh-docker's docs/sandbox.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md)) — this is the point reviewers and users are most likely to press on;
-- known limitations (upstream is still pre-release and `:latest` follows the newest version; the built-in password gate has no 2FA/audit, and if you need those, set `AUTH_MODE` to `none` and hand it to SSO);
+- known limitations (`:latest` follows the newest upstream version, alpha/rc builds included; the built-in password gate has no 2FA/audit, and if you need those, set `AUTH_MODE` to `none` and hand it to SSO);
 - **secure by default**: with nothing configured, what you install still comes with a password (`AUTH_MODE=builtin` + a password generated on first start and printed once), so you never end up with "a freshly installed, unauthenticated web UI that executes commands"; this is the answer if CA review asks.
 - troubleshooting entry points (`/healthz`; the first lines of the entrypoint in the container log state the mode and the startup result).
 
@@ -90,7 +90,7 @@ The "prove repository ownership" step requires you to place a `.unraid/community
 | `<ExtraSearchTerms>` | `deepseek harness dsh coding agent ai agent cli` | so that searching for "deepseek" also hits the application named DSH |
 | `<License>` | `MIT` | shown in the details popup |
 | `<Forum>` in `ca_profile.xml` | the same forum thread URL | ✅ filled in and uncommented |
-| `<Beta>` | not set | see [ca-pitfalls.md](ca-pitfalls.md) D1: recommended not to mark it for now, but state honestly in the support thread that upstream is still pre-release |
+| `<Beta>` | not set | see [ca-pitfalls.md](ca-pitfalls.md) D1: recommended not to mark it for now; the support thread notes that the image follows the newest upstream version |
 
 ## 6. Afterwards, on every upstream release
 

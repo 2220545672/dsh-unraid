@@ -47,7 +47,7 @@ CA 与模板指南都要求：**你自己维护的容器必须有 Unraid 论坛�
 
 - 这个应用是什么、镜像在哪、如何升级（[2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) 自动跟版，用户只需 force update）；
 - **为什么需要那两个 `--security-opt`**（Unraid 内核无 Landlock → bubblewrap 是唯一可用的沙箱层级；见 [dsh-docker 的 docs/sandbox.zh-CN.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.zh-CN.md)）——这是审核者与用户最可能追问的一点；
-- 已知限制（上游仍是预发布，`:latest` 跟随最新版；内置口令门禁没有 2FA/审计，需要这些就把 `AUTH_MODE` 设为 `none` 交给 SSO）；
+- 已知限制（`:latest` 跟随上游最新版，含 alpha/rc；内置口令门禁没有 2FA/审计，需要这些就把 `AUTH_MODE` 设为 `none` 交给 SSO）；
 - **默认安全**：不配任何东西时装出来也是带口令的（`AUTH_MODE=builtin` + 首启生成口令打印一次），不会出现"装完就是一台无认证的可执行命令 Web UI"；CA 审核问起时这就是答案。
 - 排障入口（`/healthz`、容器日志里 entrypoint 的前几行会写明模式与启动结果）。
 
@@ -90,7 +90,7 @@ CA 与模板指南都要求：**你自己维护的容器必须有 Unraid 论坛�
 | `<ExtraSearchTerms>` | `deepseek harness dsh coding agent ai agent cli` | 让搜 "deepseek" 也能命中名为 DSH 的应用 |
 | `<License>` | `MIT` | 详情弹窗展示 |
 | `ca_profile.xml` 的 `<Forum>` | 同一个论坛帖 URL | ✅ 已填入并取消注释 |
-| `<Beta>` | 未设置 | 见 [ca-pitfalls.md](ca-pitfalls.zh-CN.md) D1：建议先不标，但在支持帖里如实说明上游仍是预发布 |
+| `<Beta>` | 未设置 | 见 [ca-pitfalls.md](ca-pitfalls.zh-CN.md) D1：建议先不标，支持帖里说明镜像跟随上游最新版即可 |
 
 ## 六、之后每次上游发版
 
