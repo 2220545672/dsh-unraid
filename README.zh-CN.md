@@ -5,8 +5,8 @@
 <p align="center"><a href="README.md">English</a> · <b>中文说明</b></p>
 
 <p align="center">
-  <a href="https://github.com/2220545672/dsh-unraid/actions/workflows/validate.yml"><img src="https://github.com/2220545672/dsh-unraid/actions/workflows/validate.yml/badge.svg" alt="validate"></a>
-  <a href="https://github.com/2220545672/dsh-docker/releases"><img src="https://img.shields.io/github/v/release/2220545672/dsh-docker?label=image&color=orange" alt="image"></a>
+  <a href="https://github.com/MeiXu6693/dsh-unraid/actions/workflows/validate.yml"><img src="https://github.com/MeiXu6693/dsh-unraid/actions/workflows/validate.yml/badge.svg" alt="validate"></a>
+  <a href="https://github.com/MeiXu6693/dsh-docker/releases"><img src="https://img.shields.io/github/v/release/MeiXu6693/dsh-docker?label=image&color=orange" alt="image"></a>
   <img src="https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-lightgrey" alt="platforms">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
 </p>
@@ -29,11 +29,11 @@
 
 1. **先改口令。** 模板自带 `12345678`，这是公开值：Docker 页 → 该容器 → *Edit* → **Password** → Apply。（留空则由容器首启随机生成并只在日志里打印一次：`docker logs <容器名>`。）
 2. **指向你的项目。** 智能体在 `/workspace` 里干活（默认 `appdata/dsh/workspace`）。
-3. **填 DeepSeek API Key**：设置面板里的 *Add API key*。用 DeepSeek **账号**登录从任何浏览器也能完成：登录标签页停在打不开的 `127.0.0.1` 页面时，页面里会自动出现粘贴框——详见镜像仓库的 [docs/remote-signin.zh-CN.md](https://github.com/2220545672/dsh-docker/blob/main/docs/remote-signin.zh-CN.md)。
+3. **填 DeepSeek API Key**：设置面板里的 *Add API key*。用 DeepSeek **账号**登录从任何浏览器也能完成：登录标签页停在打不开的 `127.0.0.1` 页面时，页面里会自动出现粘贴框——详见镜像仓库的 [docs/remote-signin.zh-CN.md](https://github.com/MeiXu6693/dsh-docker/blob/main/docs/remote-signin.zh-CN.md)。
 
 ## 模板字段
 
-每个变量的完整说明（以及它背后的安全模型）见项目文档：[设置与环境变量](https://github.com/2220545672/dsh-docker/blob/main/README.zh-CN.md#可能会用到的设置) 与 [安全模型](https://github.com/2220545672/dsh-docker/blob/main/docs/security.zh-CN.md)。
+每个变量的完整说明（以及它背后的安全模型）见项目文档：[设置与环境变量](https://github.com/MeiXu6693/dsh-docker/blob/main/README.zh-CN.md#可能会用到的设置) 与 [安全模型](https://github.com/MeiXu6693/dsh-docker/blob/main/docs/security.zh-CN.md)。
 
 | 字段 | 默认 | 作用 |
 |---|---|---|
@@ -58,7 +58,7 @@ Unraid 内核没有编入 Landlock，DSH 的命令沙箱只剩第二梯队：镜
 放行的东西。没有它们，智能体的 bash 工具会拒绝执行并报 `SANDBOX_UNAVAILABLE`。
 
 对照实验、取舍，以及两种会误报的自查方式都在项目的沙箱说明里：
-[docs/sandbox.zh-CN.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.zh-CN.md)。
+[docs/sandbox.zh-CN.md](https://github.com/MeiXu6693/dsh-docker/blob/main/docs/sandbox.zh-CN.md)。
 
 ## 更新
 
@@ -71,7 +71,7 @@ Unraid 内核没有编入 Landlock，DSH 的命令沙箱只剩第二梯队：镜
 | `:alpha` · `:rc` · `:stable` | 跟随某个上游通道 |
 
 镜像在上游一发版就自动重建并冒烟测试，这里不需要任何配置——更新即可。发布说明见
-[Releases](https://github.com/2220545672/dsh-docker/releases)。
+[Releases](https://github.com/MeiXu6693/dsh-docker/releases)。
 
 ## 装插件
 
@@ -82,7 +82,7 @@ docker exec -u <PUID> <容器名> dsh plugin --profile web add @scope/some-plugi
 docker exec -u <PUID> <容器名> dsh plugin --profile web add github:owner/repo
 ```
 
-装完请重启容器，让 profile 重新组合。务必带 `-u <PUID>`——就是模板里设的那个 uid（默认 `1000`，Unraid 上是 `99`）：用 root 装，包在 appdata 里属 root，之后以该 PUID 运行的 DSH 就读不到了。如果插件还要调自己的命令行工具，那个工具也得装在数据目录下——镜像 README 写了它在每次启动时会扫的两种布局：[自己装命令行工具](https://github.com/2220545672/dsh-docker/blob/main/README.zh-CN.md#自己装命令行工具)。
+装完请重启容器，让 profile 重新组合。务必带 `-u <PUID>`——就是模板里设的那个 uid（默认 `1000`，Unraid 上是 `99`）：用 root 装，包在 appdata 里属 root，之后以该 PUID 运行的 DSH 就读不到了。如果插件还要调自己的命令行工具，那个工具也得装在数据目录下——镜像 README 写了它在每次启动时会扫的两种布局：[自己装命令行工具](https://github.com/MeiXu6693/dsh-docker/blob/main/README.zh-CN.md#自己装命令行工具)。
 
 远程登录插件已经在镜像里且默认开启——这一节是给你自己加别的东西用的。
 
@@ -97,7 +97,7 @@ docker exec -u <PUID> <容器名> dsh plugin --profile web add github:owner/repo
 | 页面一直转圈 | **Public URL** 必须与你实际打开的地址一致（协议 + 主机，不带路径）。`docker logs <容器名> \| head -30` 会打印它选定的模式。 |
 
 更多排障（登录粘贴面板、Caddy/DSH 内部、`docker inspect` 细节）见
-[项目文档](https://github.com/2220545672/dsh-docker/blob/main/README.zh-CN.md#常见问题)。
+[项目文档](https://github.com/MeiXu6693/dsh-docker/blob/main/README.zh-CN.md#常见问题)。
 
 ## 从别的 DSH 镜像迁过来
 
@@ -107,7 +107,7 @@ docker exec -u <PUID> <容器名> dsh plugin --profile web add github:owner/repo
 ## 支持
 
 - **Unraid 论坛帖：**[DSH — DeepSeek Harness, AI coding agent in your browser](https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/)——请附上 `docker logs DSH | head -30`、Unraid 与内核版本（`uname -r`）、以及 **Public URL** / **Allowed Clients** 的设置。
-- **Bug 与建议：**[GitHub Issues](https://github.com/2220545672/dsh-docker/issues)。
+- **Bug 与建议：**[GitHub Issues](https://github.com/MeiXu6693/dsh-docker/issues)。
 - **DSH 自身的问题**（模型、插件、界面）：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)。
 
 ## 许可

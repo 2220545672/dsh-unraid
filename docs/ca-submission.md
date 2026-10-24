@@ -38,15 +38,15 @@ docker pull ghcr.io/<owner>/dsh:latest
 #    Unraid: Docker → Add Container → paste the contents of templates/dsh.xml (or import dsh.xml from the release assets)
 #    After installing, confirm: the Web UI opens, /data and /workspace persist,
 #             and a command run inside DSH does not report SANDBOX_UNAVAILABLE (sandbox usable — see
-#             https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md)
+#             https://github.com/MeiXu6693/dsh-docker/blob/main/docs/sandbox.md)
 ```
 
 ## 3. Open a forum support thread (CA's requirement for self-maintained containers)
 
 Both CA and the template guide require: **a container you maintain yourself must have an Unraid forum support thread**, and `<Support>` must point to it rather than to GitHub Issues. The support thread must at least make clear:
 
-- what this application is, where the image is, and how to upgrade ([2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) tracks versions automatically, users only need to force update);
-- **why those two `--security-opt` are needed** (the Unraid kernel has no Landlock → bubblewrap is the only usable sandbox layer; see [dsh-docker's docs/sandbox.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md)) — this is the point reviewers and users are most likely to press on;
+- what this application is, where the image is, and how to upgrade ([MeiXu6693/dsh-docker](https://github.com/MeiXu6693/dsh-docker) tracks versions automatically, users only need to force update);
+- **why those two `--security-opt` are needed** (the Unraid kernel has no Landlock → bubblewrap is the only usable sandbox layer; see [dsh-docker's docs/sandbox.md](https://github.com/MeiXu6693/dsh-docker/blob/main/docs/sandbox.md)) — this is the point reviewers and users are most likely to press on;
 - known limitations (`:latest` follows the newest upstream version, alpha/rc builds included; the built-in password gate has no 2FA/audit, and if you need those, set `AUTH_MODE` to `none` and hand it to SSO);
 - **secure by default**: with nothing configured, what you install still comes with a password (`AUTH_MODE=builtin` + a password generated on first start and printed once), so you never end up with "a freshly installed, unauthenticated web UI that executes commands"; this is the answer if CA review asks.
 - troubleshooting entry points (`/healthz`; the first lines of the entrypoint in the container log state the mode and the startup result).
@@ -94,7 +94,7 @@ The "prove repository ownership" step requires you to place a `.unraid/community
 
 ## 6. Afterwards, on every upstream release
 
-Since the 2026-10-16 split, that pipeline lives in [2220545672/dsh-docker](https://github.com/2220545672/dsh-docker): its `release.yml` checks npm hourly for the highest version of `@deepseek-ai/dsh` (including alpha/rc), and when there is a new version it builds, smoke-tests and pushes the image, then publishes a Release with the notes. It no longer generates a template asset — the template is here and always installs `:latest`, and a user who wants reproducibility edits the **Repository** field to a version tag instead.
+Since the 2026-10-16 split, that pipeline lives in [MeiXu6693/dsh-docker](https://github.com/MeiXu6693/dsh-docker): its `release.yml` checks npm hourly for the highest version of `@deepseek-ai/dsh` (including alpha/rc), and when there is a new version it builds, smoke-tests and pushes the image, then publishes a Release with the notes. It no longer generates a template asset — the template is here and always installs `:latest`, and a user who wants reproducibility edits the **Repository** field to a version tag instead.
 
 Nothing in this repository has to change for an upstream release, which is the point of the split.
 

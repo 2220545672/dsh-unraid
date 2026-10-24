@@ -13,7 +13,7 @@ Every entry also states how this repository handles it: ✅ already avoided / �
 |---|---|---|---|
 | A1 | **The repository root must have `ca_profile.xml` with a non-empty `<Profile>`**, otherwise "CA will block submission finalization" | Official "Repository Information XML" | ✅ added [`ca_profile.xml`](../ca_profile.xml) (contains Profile / Icon / WebPage, `<Forum>` left commented out pending) |
 | A2 | The repository must be **public and active**, with an **OSI-approved license** at the root | Official "Submission Help" | ✅ public repository + MIT `LICENSE` |
-| A3 | Every application entry must have `<Repository>` (Docker) or `<PluginURL>` (plugin) | Official "Repository XML Format" | ✅ `<Repository>` points to `ghcr.io/2220545672/dsh:latest` |
+| A3 | Every application entry must have `<Repository>` (Docker) or `<PluginURL>` (plugin) | Official "Repository XML Format" | ✅ `<Repository>` points to `ghcr.io/meixu6693/dsh:latest` |
 | A4 | Run **Validate / Scan** when submitting; the docs also say "after every meaningful XML change" | Official "Submission Help" | ⚠️ that wording only bites for a **new** submission: `/submit/new` refuses an already-listed repository ("already enabled … no action required"), and CA re-parses the repository on its next feed rebuild (measured 2026-10-16: push 02:00 CST → live 04:11 CST). See [ca-submission.md](ca-submission.md) |
 | A5 | **A `:latest` tag that does not exist gets you blacklisted** (example: `ntop/ntopng is blacklisted with ":Latest tag does not exist"`) | Forum | ✅ the pipeline **always** pushes both `:latest` and `:<version>`; do not change it to push only version tags |
 | A6 | **A declaration that does not match reality gets you delisted**: Unspin was removed from CA because its `PluginURL` did not match the declaration inside the .plg, and after fixing it **a moderator still had to re-list it by hand**, which took several days | Forum | ⚠️ `<Repository>`/`<TemplateURL>`/`<Registry>`/`<Icon>` must all point to stable, real locations that will not move in the short term; **once submitted, do not change the image or repository name** |
@@ -34,7 +34,7 @@ Every entry also states how this repository handles it: ✅ already avoided / �
 
 | # | Pitfall | Basis | Our handling |
 |---|---|---|---|
-| C1 | **"AI-generated, lacking human review" is an explicit minus**: the original words of a CA community developer — "both plugins give me a very solid sense of 'this was AI-coded without a substantial human review / understanding of what it does'", and he pointed out that not following the conventions triggers "quality/safety" concerns | Forum (Community Developer) | ✅ small and explainable code base on both sides: this repository is a template plus four check scripts, and the image (built in [dsh-docker](https://github.com/2220545672/dsh-docker)) is a Dockerfile + two Caddyfiles + one entrypoint + three scripts, with smoke tests, template self-checks and documented sandbox controlled experiments. **You personally must be able to explain every part** (especially the two `--security-opt`) |
+| C1 | **"AI-generated, lacking human review" is an explicit minus**: the original words of a CA community developer — "both plugins give me a very solid sense of 'this was AI-coded without a substantial human review / understanding of what it does'", and he pointed out that not following the conventions triggers "quality/safety" concerns | Forum (Community Developer) | ✅ small and explainable code base on both sides: this repository is a template plus four check scripts, and the image (built in [dsh-docker](https://github.com/MeiXu6693/dsh-docker)) is a Dockerfile + two Caddyfiles + one entrypoint + three scripts, with smoke tests, template self-checks and documented sandbox controlled experiments. **You personally must be able to explain every part** (especially the two `--security-opt`) |
 | C2 | **"Someone else will review the code for me" is a wrong expectation**: "It's your plugin. You write it, not the CA team… This expectation that someone else will do a code review for you is wrong." | Forum | ⚠️ once listed, it is your responsibility; the support thread must give a troubleshooting path |
 | C3 | **Containers are encouraged more than plugins**: "Plugins which are better suited as a docker application are not eligible for inclusion in CA", and containers are "better from a security/safety standpoint" | Forum (Community Developer relaying CA policy) | ✅ we take the Docker template route (the correct one) |
 | C4 | **root / docker.sock / `/boot` / credentials in the template** are review focal points: the community explicitly lists `/boot` and `/var/run/docker.sock` as host paths that should be excluded; another post stresses "Claude Code running as root has unrestricted ability…" | Forum | ✅ inside the container we initialize as root and then drop to **a non-root identity (`PUID`/`PGID`, 1000 by default)**; no docker socket, no `/boot`; **the template requires no API key** (model credentials are managed by DSH itself under `/data`) |
@@ -56,12 +56,12 @@ Every entry also states how this repository handles it: ✅ already avoided / �
 node scripts/check-template.mjs templates/dsh.xml
 
 # 2. Render a "release" template and check it again (this is how the release assets are generated)
-node scripts/render-template.mjs --owner=2220545672 --repo=dsh-unraid --tag=latest --out=/tmp/dsh.xml
+node scripts/render-template.mjs --owner=meixu6693 --repo=dsh-unraid --tag=latest --out=/tmp/dsh.xml
 node scripts/check-template.mjs /tmp/dsh.xml
 
 # 3. Image anonymously pullable + multi-architecture
-curl -s "https://ghcr.io/token?scope=repository:2220545672/dsh:pull&service=ghcr.io" | head -c 80
+curl -s "https://ghcr.io/token?scope=repository:meixu6693/dsh:pull&service=ghcr.io" | head -c 80
 
 # 4. The icon must be reachable from China (raw and jsdelivr both fail, see docs/ca-submission.md)
-curl -sI "https://gh-proxy.com/https://raw.githubusercontent.com/2220545672/dsh-unraid/main/templates/img/dsh.png" | head -1
+curl -sI "https://gh-proxy.com/https://raw.githubusercontent.com/MeiXu6693/dsh-unraid/main/templates/img/dsh.png" | head -1
 ```

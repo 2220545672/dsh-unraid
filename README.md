@@ -5,8 +5,8 @@
 <p align="center"><b>English</b> · <a href="README.zh-CN.md">中文说明</a></p>
 
 <p align="center">
-  <a href="https://github.com/2220545672/dsh-unraid/actions/workflows/validate.yml"><img src="https://github.com/2220545672/dsh-unraid/actions/workflows/validate.yml/badge.svg" alt="validate"></a>
-  <a href="https://github.com/2220545672/dsh-docker/releases"><img src="https://img.shields.io/github/v/release/2220545672/dsh-docker?label=image&color=orange" alt="image"></a>
+  <a href="https://github.com/MeiXu6693/dsh-unraid/actions/workflows/validate.yml"><img src="https://github.com/MeiXu6693/dsh-unraid/actions/workflows/validate.yml/badge.svg" alt="validate"></a>
+  <a href="https://github.com/MeiXu6693/dsh-docker/releases"><img src="https://img.shields.io/github/v/release/MeiXu6693/dsh-docker?label=image&color=orange" alt="image"></a>
   <img src="https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-lightgrey" alt="platforms">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
 </p>
@@ -37,11 +37,11 @@
 
 1. **Change the password.** The template ships `12345678`, which is public knowledge — Docker tab → the container → *Edit* → **Password** → Apply. (Cleared, the container generates one and prints it once: `docker logs <container>`.)
 2. **Point it at your project.** The agent works in `/workspace` (default `appdata/dsh/workspace`).
-3. **Add a DeepSeek API key** — *Add API key* in the settings panel. A DeepSeek **account** also works from any browser: the login tab ends on a dead `127.0.0.1` page and a paste panel appears in the DSH page by itself — see the image's [docs/remote-signin.md](https://github.com/2220545672/dsh-docker/blob/main/docs/remote-signin.md).
+3. **Add a DeepSeek API key** — *Add API key* in the settings panel. A DeepSeek **account** also works from any browser: the login tab ends on a dead `127.0.0.1` page and a paste panel appears in the DSH page by itself — see the image's [docs/remote-signin.md](https://github.com/MeiXu6693/dsh-docker/blob/main/docs/remote-signin.md).
 
 ## Template fields
 
-Full descriptions of every variable — and of the security model behind them — are in the project documentation: [settings and environment variables](https://github.com/2220545672/dsh-docker#settings-you-may-need) and [the security model](https://github.com/2220545672/dsh-docker/blob/main/docs/security.md).
+Full descriptions of every variable — and of the security model behind them — are in the project documentation: [settings and environment variables](https://github.com/MeiXu6693/dsh-docker#settings-you-may-need) and [the security model](https://github.com/MeiXu6693/dsh-docker/blob/main/docs/security.md).
 
 | Field | Default | What it does |
 |---|---|---|
@@ -69,7 +69,7 @@ what let it through. Without them the agent's bash tool refuses to run and repor
 
 The controlled experiments, the trade-off and the two checks that produce false alarms
 are in the project's sandbox notes:
-[sandbox.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md).
+[sandbox.md](https://github.com/MeiXu6693/dsh-docker/blob/main/docs/sandbox.md).
 
 ## Update
 
@@ -83,7 +83,7 @@ are in the project's sandbox notes:
 
 The image is rebuilt and smoke-tested automatically as soon as upstream publishes a
 release, so there is nothing to configure here — just update. Release notes:
-[Releases](https://github.com/2220545672/dsh-docker/releases).
+[Releases](https://github.com/MeiXu6693/dsh-docker/releases).
 
 ## Plugins
 
@@ -101,7 +101,7 @@ ends up owned by root inside your appdata directory, and DSH — which runs as t
 can no longer read it. A plugin that shells out to its own command-line tool
 needs that tool under the data directory as well; the image README documents the two
 layouts it scans at every start:
-[Installing your own CLI tools](https://github.com/2220545672/dsh-docker#installing-your-own-cli-tools).
+[Installing your own CLI tools](https://github.com/MeiXu6693/dsh-docker#installing-your-own-cli-tools).
 
 The remote sign-in plugin is already in the image and on by default — this is for
 everything else you want to add.
@@ -117,7 +117,7 @@ everything else you want to add.
 | Page never finishes loading | **Public URL** must match the address you actually open (scheme + host, no path). `docker logs <container> \| head -30` prints the mode it chose. |
 
 More troubleshooting (the sign-in paste panel, Caddy/DSH internals, `docker inspect`
-details) is in the [project documentation](https://github.com/2220545672/dsh-docker#problems).
+details) is in the [project documentation](https://github.com/MeiXu6693/dsh-docker#problems).
 
 ## Moving over from another DSH image
 
@@ -127,7 +127,7 @@ community image, with minimal downtime: [docs/migrate-from-another-image.md](doc
 ## Support
 
 - **Unraid forum thread:** [DSH — DeepSeek Harness, AI coding agent in your browser](https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/) — please include `docker logs DSH | head -30`, your Unraid and kernel version (`uname -r`), and how **Public URL** / **Allowed Clients** are set.
-- **Bugs and requests:** [GitHub Issues](https://github.com/2220545672/dsh-docker/issues).
+- **Bugs and requests:** [GitHub Issues](https://github.com/MeiXu6693/dsh-docker/issues).
 - **Bugs in DSH itself** (models, plugins, UI): [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness).
 
 ## License

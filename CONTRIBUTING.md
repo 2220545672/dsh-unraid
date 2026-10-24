@@ -5,7 +5,7 @@
 This repository owns the **Community Applications template** for DSH and nothing else:
 `templates/dsh.xml`, the icon, the CA repository profile, the CA documentation and the
 scripts that check them. The container image is built and published by
-[2220545672/dsh-docker](https://github.com/2220545672/dsh-docker); the template installs
+[MeiXu6693/dsh-docker](https://github.com/MeiXu6693/dsh-docker); the template installs
 that image's `:latest` tag.
 
 ## Repository layout
@@ -54,7 +54,7 @@ for the XML/YAML well-formedness pass, and skipping is not allowed.
 
 | Field | Why |
 |---|---|
-| `<Repository>` | It is the image users install. It points at `ghcr.io/2220545672/dsh:latest`. |
+| `<Repository>` | It is the image users install. It points at `ghcr.io/meixu6693/dsh:latest`. |
 | `<TemplateURL>`, `<Icon>`, `<ReadMe>` | They point at files on this repository's `main` branch; CA and installed machines re-read them. A rename or a move breaks the catalogue entry. |
 | `<Registry>` | Points at the GHCR package page. It follows wherever the package is linked. |
 | `<Support>` | CA requires a **forum thread** for a self-maintained container, not a GitHub issue tracker. |
@@ -76,7 +76,7 @@ Two things couple this repository to the image, and both are checked or document
    skipped by accident. `TZ` is the one variable the entrypoint legitimately does not read
    (the base image handles it), and it is allowlisted in the script with that reason.
 2. **The two `--security-opt` flags** in `<ExtraParams>`, which come with the image's
-   sandbox design ([docs/sandbox.md in dsh-docker](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md)).
+   sandbox design ([docs/sandbox.md in dsh-docker](https://github.com/MeiXu6693/dsh-docker/blob/main/docs/sandbox.md)).
    The contract check warns if the image's `compose.yaml` stops carrying them.
 
 **Renaming or removing an environment variable in the image is a breaking change here.**
@@ -110,5 +110,5 @@ to reach everybody belongs in the image.
 ## Versioning
 
 This repository has no releases. The image's tags and release notes live in
-[dsh-docker](https://github.com/2220545672/dsh-docker/releases); the template follows
+[dsh-docker](https://github.com/MeiXu6693/dsh-docker/releases); the template follows
 `:latest` and therefore needs no version handshake.

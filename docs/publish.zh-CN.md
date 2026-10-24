@@ -3,10 +3,10 @@
 # 发布这个模板（以及整体 fork）
 
 本仓库是 DSH 的 **Unraid 那一侧**：Community Applications 模板，以及围绕它的检查与文档。
-容器镜像由 [2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) 构建、冒烟测试并
+容器镜像由 [MeiXu6693/dsh-docker](https://github.com/MeiXu6693/dsh-docker) 构建、冒烟测试并
 发布——这里没有 Dockerfile，本仓库也不产出任何 release 或镜像 tag。（2026-10-16 拆分之前那条
 发布链留下的两个 Release 已于 2026-10-17 删除：Releases 页为空是**预期状态**，不代表项目停更——
-镜像的 release 见 [dsh-docker 的 releases](https://github.com/2220545672/dsh-docker/releases)。）
+镜像的 release 见 [dsh-docker 的 releases](https://github.com/MeiXu6693/dsh-docker/releases)。）
 
 这份文档是 fork 的操作手册，也是维护者改模板时的checklist。
 
@@ -35,7 +35,7 @@ fork 还要决定两件事：
   [ca-submission.zh-CN.md](ca-submission.zh-CN.md) §3）。
 
 如果你想连镜像也自己构建，那就去 fork
-[dsh-docker](https://github.com/2220545672/dsh-docker)，并把 `<Repository>` 指向你的镜像。它的
+[dsh-docker](https://github.com/MeiXu6693/dsh-docker)，并把 `<Repository>` 指向你的镜像。它的
 `CONTRIBUTING.md` 讲了 GHCR 包设置（工作流权限、包可见性，以及构建跑在"包未链接的仓库"时需要的
 *Manage Actions access* 授权）。
 

@@ -3,7 +3,7 @@
  * Cross-repository check: does the template still describe the image it installs?
  *
  * The template and the image now live in two repositories
- * (2220545672/dsh-unraid and 2220545672/dsh-docker). The contract between them is
+ * (MeiXu6693/dsh-unraid and MeiXu6693/dsh-docker). The contract between them is
  * small but silently breakable: every `<Config Type="Variable" Target="NAME">` in
  * the template is an environment variable that the image's entrypoint has to
  * understand. Rename one on the image side and the template keeps handing the
@@ -30,7 +30,7 @@ import process from 'node:process'
 const file = resolve(process.argv[2] ?? 'templates/dsh.xml')
 const xml = readFileSync(file, 'utf8').replace(/<!--[\s\S]*?-->/g, '')
 
-const IMAGE_REPO = process.env.IMAGE_REPO ?? '2220545672/dsh-docker'
+const IMAGE_REPO = process.env.IMAGE_REPO ?? 'MeiXu6693/dsh-docker'
 // Overridable so a fork can point at its own image repository, and so this check can
 // be exercised from a network that cannot reach raw.githubusercontent.com directly
 // (the Chinese networks this project is developed on route it through gh-proxy.com:

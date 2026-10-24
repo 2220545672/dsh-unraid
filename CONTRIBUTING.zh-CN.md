@@ -4,7 +4,7 @@
 
 本仓库只负责 DSH 的 **Community Applications 模板**：`templates/dsh.xml`、图标、CA 仓库
 profile、CA 相关文档，以及检查它们的脚本。容器镜像由
-[2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) 构建与发布；模板安装的就是
+[MeiXu6693/dsh-docker](https://github.com/MeiXu6693/dsh-docker) 构建与发布；模板安装的就是
 它的 `:latest`。
 
 ## 仓库结构
@@ -50,7 +50,7 @@ XML/YAML 结构校验，不允许跳过。
 
 | 字段 | 原因 |
 |---|---|
-| `<Repository>` | 它就是用户安装的镜像，指向 `ghcr.io/2220545672/dsh:latest`。 |
+| `<Repository>` | 它就是用户安装的镜像，指向 `ghcr.io/meixu6693/dsh:latest`。 |
 | `<TemplateURL>`、`<Icon>`、`<ReadMe>` | 指向本仓库 `main` 上的文件；CA 与已安装的机器都会去读。改名或挪位置会让目录条目失效。 |
 | `<Registry>` | 指向 GHCR 包页面，跟着包的链接关系走。 |
 | `<Support>` | CA 要求自维护容器用**论坛帖**，不是 GitHub issue。 |
@@ -70,7 +70,7 @@ XML/YAML 结构校验，不允许跳过。
    在 CI 里会因为"根本没取到"直接失败，所以这条检查不会被悄悄跳过。`TZ` 是唯一一个 entrypoint
    合理地不读的变量（由基础镜像处理），已在脚本里带原因地列入白名单。
 2. **`<ExtraParams>` 里的两个 `--security-opt`**，它们来自镜像的沙箱设计（
-   [dsh-docker 的 docs/sandbox.zh-CN.md](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.zh-CN.md)）。
+   [dsh-docker 的 docs/sandbox.zh-CN.md](https://github.com/MeiXu6693/dsh-docker/blob/main/docs/sandbox.zh-CN.md)）。
    如果镜像的 `compose.yaml` 不再带这两个参数，契约检查会给出警告。
 
 **在镜像侧改环境变量名或删掉环境变量，对本仓库就是破坏性变更。** 要在论坛帖里公告，并同步改
@@ -101,5 +101,5 @@ Applications and does not need to be submitted"，CA 会在下一次 feed 重建
 ## 版本
 
 本仓库没有 release。镜像的 tag 与发布说明在
-[dsh-docker](https://github.com/2220545672/dsh-docker/releases)；模板跟随 `:latest`，因此不需要
+[dsh-docker](https://github.com/MeiXu6693/dsh-docker/releases)；模板跟随 `:latest`，因此不需要
 任何版本握手。

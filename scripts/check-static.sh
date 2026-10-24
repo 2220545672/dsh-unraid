@@ -3,7 +3,7 @@
 # The static gate for this repository: the Community Applications template.
 #
 # This repository used to build the container image too. The image moved to
-# 2220545672/dsh-docker, and the checks that belong to it (shell/node syntax of the
+# MeiXu6693/dsh-docker, and the checks that belong to it (shell/node syntax of the
 # entrypoint, hadolint, `caddy validate`, the image smoke test) moved with it. What
 # is left is what a *template* repository has to guarantee, plus one
 # cross-repository check: the environment variables the template hands the container

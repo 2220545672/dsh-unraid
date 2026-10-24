@@ -28,7 +28,7 @@ Unraid `Docker → Add Container` → import `templates/dsh.xml`, then adjust as
 | `/data` | The old data directory | No data to move; an empty directory is fine too, it is initialized on first start |
 | `/workspace` | The old workspace directory | Same as above |
 | `PUBLIC_URL` | `https://<your.domain>` | Runs edge mode (reverse proxy + authentication in front); leave empty on a pure LAN |
-| Extra Parameters | **Keep the default** (both `--security-opt` values) | Otherwise the bash tool is unusable on Unraid, see [the sandbox notes](https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md) |
+| Extra Parameters | **Keep the default** (both `--security-opt` values) | Otherwise the bash tool is unusable on Unraid, see [the sandbox notes](https://github.com/MeiXu6693/dsh-docker/blob/main/docs/sandbox.md) |
 
 ### 2. Verify
 

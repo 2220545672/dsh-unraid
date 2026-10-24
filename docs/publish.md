@@ -4,11 +4,11 @@
 
 This repository is the **Unraid side** of DSH: the Community Applications template plus
 the checks and documentation around it. The container image is built, smoke-tested and
-published by [2220545672/dsh-docker](https://github.com/2220545672/dsh-docker) — there is
+published by [MeiXu6693/dsh-docker](https://github.com/MeiXu6693/dsh-docker) — there is
 no Dockerfile here and this repository produces no releases or image tags. (The two
 Releases left over from the pre-2026-10-16 publishing chain were deleted on 2026-10-17,
 so the Releases page being empty is the intended state and not an abandoned project —
-see the image repository's [releases](https://github.com/2220545672/dsh-docker/releases).)
+see the image repository's [releases](https://github.com/MeiXu6693/dsh-docker/releases).)
 
 This document is the runbook for a fork, and for the maintainer's own changes to the
 template.
@@ -39,7 +39,7 @@ Two more things a fork must decide:
   [ca-submission.md](ca-submission.md) §3 for what it has to cover).
 
 If you also want to build your own image, fork
-[dsh-docker](https://github.com/2220545672/dsh-docker) instead and point `<Repository>`
+[dsh-docker](https://github.com/MeiXu6693/dsh-docker) instead and point `<Repository>`
 at your image. Its `CONTRIBUTING.md` covers the GHCR package settings (workflow
 permissions, package visibility, and the *Manage Actions access* grant a build needs when
 it runs in a repository the package is not linked to).

@@ -1,7 +1,7 @@
 name: validate
 
 # The template repository's gate. The image's own checks (Dockerfile lint, Caddy
-# validation, the container smoke test) run in 2220545672/dsh-docker; what matters
+# validation, the container smoke test) run in MeiXu6693/dsh-docker; what matters
 # here is that the Community Applications template is well-formed, that the icon is
 # reproducible, and that the template still matches the image it installs
 # (scripts/check-image-contract.mjs).

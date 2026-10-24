@@ -205,7 +205,7 @@ else if (!support.includes('forums.unraid.net')) warnings.push(`<Support> points
 
 // 5 — the sandbox flags are the whole point of this template. The reasoning lives with
 //     the image now (this repository no longer carries the entrypoint or the sandbox
-//     document): https://github.com/2220545672/dsh-docker/blob/main/docs/sandbox.md
+//     document): https://github.com/MeiXu6693/dsh-docker/blob/main/docs/sandbox.md
 const extra = tag('ExtraParams')
 for (const flag of ['seccomp=unconfined', 'systempaths=unconfined']) {
   if (!extra.includes(flag)) {

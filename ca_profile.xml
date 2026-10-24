@@ -11,7 +11,7 @@
 -->
 <CommunityApplications>
   <Profile>DSH（DeepSeek Harness，浏览器里用的开源 AI 编码智能体）在 Unraid 上的 Community Applications 模板：多架构镜像（amd64 / arm64）随上游发版自动重建，内置 bubblewrap 以适配没有 Landlock 的 Unraid 内核，并提供中英文安装文档、沙箱原理说明与从其它镜像迁移的步骤。容器内置 Caddy 反向代理、可选口令门禁与 ALLOWED_CLIENTS 白名单，以非 root 身份（`PUID`/`PGID`，默认 1000）运行。 | DSH (DeepSeek Harness), an open-source AI coding agent you drive from the browser, packaged for Unraid: a multi-arch image (amd64 / arm64) rebuilt automatically for each upstream release, with bubblewrap bundled for Unraid kernels that lack Landlock, plus installation documentation in Chinese and English, the sandbox rationale, and a migration guide. Support goes through the Unraid forum thread linked in this profile. The container bundles its reverse proxy, an optional password gate and an ALLOWED_CLIENTS allowlist, and runs unprivileged as `PUID`/`PGID` (1000 by default). | 支持请走本 profile 中链接的 Unraid 论坛支持帖。</Profile>
-  <Icon>https://gh-proxy.com/https://raw.githubusercontent.com/2220545672/dsh-unraid/main/icon.svg</Icon>
-  <WebPage>https://github.com/2220545672/dsh-unraid</WebPage>
+  <Icon>https://gh-proxy.com/https://raw.githubusercontent.com/MeiXu6693/dsh-unraid/main/icon.svg</Icon>
+  <WebPage>https://github.com/MeiXu6693/dsh-unraid</WebPage>
   <Forum>https://forums.unraid.net/topic/200908-support-dsh-deepseek-harness-ai-coding-agent-in-your-browser/</Forum>
 </CommunityApplications>
